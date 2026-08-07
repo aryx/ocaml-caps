@@ -1,0 +1,9 @@
+(library
+ (public_name caps)
+ (wrapped false)
+ (libraries
+    unix
+    ;memtrace
+ )
+ ;(preprocess (pps ppx_deriving.show))
+)
