@@ -1,3 +1,10 @@
 ; The OCaml Trusted Computing Base!
 ; see https://en.wikipedia.org/wiki/Trusted_computing_base for more info
 
+(library
+ (name caps_tcb)
+ (public_name caps.tcb)
+ (wrapped false)
+ (libraries
+ )
+)
