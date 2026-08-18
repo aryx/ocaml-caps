@@ -24,7 +24,7 @@ dimension: 16:9
 {pause up}
 # Motivations
 
-{.example title="Mymodule.mli"}
+{.example title="MyModule.mli"}
 ```ocaml
 val foo : int -> float
 ```
@@ -139,7 +139,7 @@ This talk just pushes the [discipline]{.em} further.
 {pause up}
 # Capabilities are abstract (combining) types
 
-Capabilities are deliberately [fine-grained]{.em} — one per syscall;
+Capabilities are deliberately [fine-grained]{.em} — one per syscall and resource;
 [object types]{.em} allows to [combine]{.em} them for free, no OCaml extension
 needed.
 
@@ -249,8 +249,8 @@ boundary is the only thing keeping them apart.
 
 {pause down}
 `Cap.main`:
-- Callable exactly once — checked dynamically. {pause}
-- Hands your entry point **every** capability. {pause}
+- Callable exactly once — checked dynamically.
+- Hands your entry point **every** capability.
 - The entry point then **downcasts** (`:>`) to give each callee only
   the subset it needs.
 
