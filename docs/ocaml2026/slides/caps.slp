@@ -24,7 +24,7 @@ dimension: 16:9
 {pause up}
 # Motivations
 
-{.example}
+{.example title="Mymodule.mli"}
 ```ocaml
 val foo : int -> float
 ```
@@ -50,7 +50,7 @@ The type says nothing. You cannot [reason]{.em} locally about a module.
 The `IO` [monad]{.em} forces you to mark [effectful]{.em} code.
 
 {pause}
-{.example}
+{.example title="API.hs"}
 ```haskell
 putStrLn   :: String -> IO ()
 removeFile :: String -> IO ()
@@ -72,7 +72,7 @@ Inspired by [eio](https://roscidus.com/blog/blog/2023/04/26/lambda-capabilities/
 generalized with plain OCaml **object types**.
 
 {pause}
-{.example}
+{.example title="MyCapModule.mli"}
 ```ocaml
 val bar :
   < Cap.fork; Cap.network; Cap.stdout; Cap.random; .. > ->
@@ -84,7 +84,7 @@ Now the signature says everything `bar` might do — and nothing it
 can't.
 
 {pause}
-{.example}
+{.example title="CapStdlib.mli"}
 ```ocaml
 val print_string : < Cap.stdout; .. >  -> string -> unit
 val delete_file  : < Cap.fs; .. >      -> string -> unit
@@ -129,7 +129,7 @@ This talk just pushes the [discipline]{.em} further.
 {pause up}
 ## Capabilities are abstract types
 
-{.example}
+{.example title="Cap.mli"}
 ```ocaml
 module Process : sig
   type fork   (* abstract: can not be forged *)
