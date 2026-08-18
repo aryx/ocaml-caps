@@ -80,6 +80,10 @@ val bar :
 ```
 
 {pause}
+`< x; .. >` is OCaml's [object type]{.em} syntax — also known as
+[row types]{.em}: "an object with *at least* field `x` (maybe more)."
+
+{pause}
 Now the signature says everything `bar` might do — and nothing it
 can't.
 
@@ -183,6 +187,13 @@ let restart (caps : < Cap.fork; Cap.wait; .. >) () =
 The `.mli` signature does all the enforcement — the implementation
 doesn't even need to touch `caps`. `CapSys`, `CapStdlib`,
 `CapRandom`, ... do the same, one function at a time.
+
+{pause up}
+# But two things are missing
+
+{.outline}
+- Where do the *first* capabilities come from? [bootstrapping — `Cap.main`]{.sub}
+- What stops someone from calling `Unix.fork` directly? [enforcement — capability rules]{.sub}
 
 {pause up}
 ## The only door in: `Cap.main`
@@ -312,6 +323,10 @@ A record needs an *exact* field match. An object's open row (`..`)
 accepts anything with *at least* these fields — so a bigger
 capability set is automatically a [subtype]{.em} of a smaller one, no
 boilerplate.
+
+{pause}
+I finally found a use case for objects in OCaml :) — notoriously
+unloved, even by OCaml programmers themselves.
 
 {pause}
 {.block title="Isn't the space of possible capabilities huge?"}
