@@ -191,8 +191,6 @@ let restart (caps : < Cap.fork; Cap.wait; .. >) () =
 {pause down}
 The beauty: the OCaml [typechecker]{.em} does all the capability
 checking for us, for free — it even [infers]{.em} capabilities!
-`CapSys`, `CapStdlib`, `CapRandom`, ... do the same, one function at
-a time.
 
 {pause up}
 # But two things are missing
@@ -245,11 +243,12 @@ val main : (all_caps -> 'a) -> 'a
 >     f powerbox)
 > ```
 
-{pause}
+{pause down}
 Every capability is secretly just `unit` at runtime — the `.mli`
 boundary is the only thing keeping them apart.
 
 {pause down}
+`Cap.main`:
 - Callable exactly once — checked dynamically. {pause}
 - Hands your entry point **every** capability. {pause}
 - The entry point then **downcasts** (`:>`) to give each callee only
@@ -270,7 +269,8 @@ let () =
 instead of `CapUnix.fork`.
 
 {pause}
-Enforce it with a Semgrep **capability rule**:
+Enforce the [discipline]{.em} via a [Semgrep](https://semgrep.dev)
+**capability rule**:
 
 {pause}
 {.example}
@@ -286,6 +286,12 @@ Enforce it with a Semgrep **capability rule**:
   |||,
 }
 ```
+
+{pause}
+No time to explain [Semgrep](https://semgrep.dev) in depth here — I
+actually presented it at this very workshop, back in 2021 :) (though
+things have changed since — `jsonnet` instead of YAML, different
+syntax).
 
 {pause up}
 # Going one step further
@@ -367,6 +373,13 @@ Same call: ambient authority, low risk, not worth the friction.
 {.block title="Won't every signature explode in size?"}
 Row polymorphism (`..`) — a function only names what it actually
 uses; the rest stays polymorphic.
+
+{pause down}
+{.block title="Is this an effect system?"}
+Not really. `List.map : ('a -> 'b) -> 'a list -> 'b list` has the
+*same* type whether or not the callback uses capabilities. {pause}
+Actually an advantage: just close over `caps` in the closure you
+pass, exactly like you already do for `in_channel` / `out_channel`.
 
 {pause down}
 {.block title="Why object types, not records?"}
