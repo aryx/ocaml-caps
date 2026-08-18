@@ -127,38 +127,62 @@ Capabilities aren't a new idea — Unix and OCaml already use them.
 This talk just pushes the [discipline]{.em} further.
 
 {pause up}
-## Capabilities are abstract types
+## Capabilities are abstract (combining) types
 
-{.example title="Cap.mli"}
-```ocaml
-module Process : sig
-  type fork   (* abstract: can not be forged *)
-  type exit
-  type chdir
-  ...
-end
-
-type fork = < fork : Process.fork >
-```
-
-{pause up}
-## Combining capabilities
-
-Capabilities are deliberately fine-grained — one per resource. Real
-code needs many at once, so we need a way to combine them.
+Capabilities are deliberately [fine-grained]{.em} — one per resource;
+[object types]{.em} allows to [combine]{.em} them for free, no OCaml extension
+needed.
 
 {pause}
-Object types [naturally]{.em} fit: row-typed, they combine for free —
-no OCaml extension needed.
+{style="display:flex; gap:20px; align-items:flex-start"}
+> {.example title="Cap.mli" style="flex:1"}
+> ```ocaml
+> module Process : sig
+>   (* abstract: can not be forged *)
+>   type fork   
+>   type wait
+>   ...
+> end
+>
+> type fork = < fork : Process.fork >
+> type wait = < wait : Process.wait >
+>
+> (* combine capabilities  *)
+> type forkw = < fork; wait >
+> ```
+>
+> {style="flex:1; display:flex; flex-direction:column; gap:16px"}
+> > {pause}
+> > {.example title="CapUnix.mli"}
+> > ```ocaml
+> > val fork : 
+> >   < Cap.fork; .. > -> unit ->
+> >   int
+> > val wait :
+> >   < Cap.wait; .. > -> unit ->
+> >     int * Unix.process_status
+> > ```
+> >
+> > {pause}
+> > {.example title="CapUnix.ml"}
+> > ```ocaml
+> > let fork _caps = Unix.fork
+> > let wait _caps = Unix.wait
+> > ```
 
-{pause}
-{.example title="Cap.mli"}
+{pause down}
+{.example title="mymodule.ml"}
 ```ocaml
-type network = < network : Network.t >
-
-(* combine capabilities just by listing them *)
-type fork_and_network = < fork; network >
+let restart (caps : < Cap.fork; Cap.wait; .. >) () =
+  match CapUnix.fork caps () with
+  | 0 -> exec_new_version ()
+  | _ -> ignore (CapUnix.wait caps ())
 ```
+
+{pause down}
+The `.mli` signature does all the enforcement — the implementation
+doesn't even need to touch `caps`. `CapSys`, `CapStdlib`,
+`CapRandom`, ... do the same, one function at a time.
 
 {pause up}
 ## The only door in: `Cap.main`
@@ -176,41 +200,6 @@ val main : (all_caps -> 'a) -> 'a
 - Hands your entry point **every** capability. {pause}
 - The entry point then **downcasts** (`:>`) to give each callee only
   the subset it needs.
-
-{pause up}
-## Capability-aware wrappers
-
-`CapUnix`, `CapSys`, `CapStdlib`, `CapRandom`, ... wrap the standard
-library one dangerous function at a time. All three pieces, together:
-
-{pause}
-{style="display:flex; gap:20px; align-items:flex-start"}
-> {.example title="Cap.mli" style="flex:1"}
-> ```ocaml
-> type fork = < fork : Process.fork >
-> type wait = < wait : Process.wait >
-> ```
->
-> {pause}
-> {.example title="CapUnix.ml" style="flex:1"}
-> ```ocaml
-> let fork _caps = Unix.fork
-> let wait _caps = Unix.wait
-> ```
->
-> {pause}
-> {.example title="mymodule.ml" style="flex:1"}
-> ```ocaml
-> let restart
->     (caps : < Cap.fork; Cap.wait; .. >) () =
->   match CapUnix.fork caps () with
->   | 0 -> exec_new_version ()
->   | _ -> ignore (CapUnix.wait caps ())
-> ```
-
-{pause}
-The `.mli` signature does all the enforcement — the implementation
-doesn't even need to touch `caps`.
 
 {pause up}
 # Capability rules
