@@ -38,14 +38,24 @@ What can `foo` do?
 - `fork()` bomb your machine? {pause} [⚠️ Yes.]{.danger}
 
 {pause}
-The type says nothing. You cannot [reason]{style="color:red"} locally about a module.
+The type says nothing. You cannot [reason]{.em} locally about a module.
 
 {pause up}
 ## Doesn't Haskell solve this?
 
-The `IO` monad forces you to mark effectful code. {pause} But it's
-coarse-grained: printing to stdout and opening a socket get the
-**same type**.
+The `IO` [monad]{.em} forces you to mark [effectful]{.em} code.
+
+{pause}
+{.example}
+```haskell
+putStrLn   :: String -> IO ()
+removeFile :: String -> IO ()
+connect    :: Socket -> SockAddr -> IO ()
+```
+
+{pause}
+All three return `IO ()`. Printing, destroying data, reaching the
+internet — [coarse-grained]{.em} by default.
 
 {pause up}
 # Capability types
@@ -64,6 +74,16 @@ val bar :
 {pause}
 Now the signature says everything `bar` might do — and nothing it
 can't.
+
+{pause}
+Remember `putStrLn`/`removeFile`/`connect`, all typed `IO ()`? Here
+each carries its danger in the type itself.
+
+{.example}
+```ocaml
+val delete_file : < Cap.fs; .. > -> string -> unit
+val open_socket : < Cap.network; .. > -> string -> unit
+```
 
 {pause up}
 ## Capabilities are abstract types
@@ -205,6 +225,21 @@ sneak past review.
   documentation.
 
 {pause up}
+# Related work
+
+{pause}
+- **eio** (OCaml) — the direct inspiration: effects tracked via
+  capabilities on I/O. {pause}
+- **cap-std** (Rust) — capability-safe wrappers around the OS,
+  removing ambient authority. {pause}
+- **Pony** — reference capabilities baked into the type system
+  itself. {pause}
+- **Haskell** — mtl-style typeclasses (`MonadFileSystem`, ...) or
+  effect libraries (`polysemy`, `fused-effects`, `effectful`) can get
+  similar fine-grained tracking, at the cost of extra machinery on
+  top of plain `IO`.
+
+{pause up}
 # Thank you
 
 - `Cap.ml`: <https://github.com/aryx/xix/blob/master/lib_core/commons/Cap.ml>
@@ -229,5 +264,8 @@ sneak past review.
   padding: 2px 10px;
   border-radius: 6px;
   margin-left: 12px;
+}
+.em {
+  color: red;
 }
 </style>
