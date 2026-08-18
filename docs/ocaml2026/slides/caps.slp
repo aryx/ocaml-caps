@@ -110,7 +110,7 @@ functional programming!
 
 {.definition}
 An **unforgeable token** that both **designates** a resource and
-**grants the authority** to use it — no reference, no access.
+**grants the authority** to use it — no reference => no access.
 <!--alt: A **communicable**, **unforgeable** token of authority -->
 
 
@@ -120,7 +120,7 @@ an open file and lets you act on it — you cannot [forge]{.em} one, the
 kernel hands it to you.
 
 {pause}
-OCaml too: `in_channel` / `out_channel` (refined!).
+OCaml too with **channels**: `in_channel` / `out_channel` (refined read/write capabilities).
 
 {pause}
 Capabilities aren't a new idea — Unix and OCaml already use them.
@@ -141,9 +141,24 @@ end
 type fork = < fork : Process.fork >
 ```
 
+{pause up}
+## Combining capabilities
+
+Capabilities are deliberately fine-grained — one per resource. Real
+code needs many at once, so we need a way to combine them.
+
 {pause}
-Row-typed object types combine them for free — no OCaml extension
-needed.
+Object types [naturally]{.em} fit: row-typed, they combine for free —
+no OCaml extension needed.
+
+{pause}
+{.example title="Cap.mli"}
+```ocaml
+type network = < network : Network.t >
+
+(* combine capabilities just by listing them *)
+type fork_and_network = < fork; network >
+```
 
 {pause up}
 ## The only door in: `Cap.main`
@@ -165,20 +180,37 @@ val main : (all_caps -> 'a) -> 'a
 {pause up}
 ## Capability-aware wrappers
 
-{.example}
-```ocaml
-let fork (caps : < Cap.fork; .. >) =
-  let _ = caps#fork in
-  Unix.fork
-
-let chdir (caps : < Cap.chdir; .. >) =
-  let _ = caps#chdir in
-  Unix.chdir
-```
+`CapUnix`, `CapSys`, `CapStdlib`, `CapRandom`, ... wrap the standard
+library one dangerous function at a time. All three pieces, together:
 
 {pause}
-`CapUnix`, `CapSys`, `CapStdlib`, `CapRandom`, ... wrap the standard
-library one dangerous function at a time.
+{style="display:flex; gap:20px; align-items:flex-start"}
+> {.example title="Cap.mli" style="flex:1"}
+> ```ocaml
+> type fork = < fork : Process.fork >
+> type wait = < wait : Process.wait >
+> ```
+>
+> {pause}
+> {.example title="CapUnix.ml" style="flex:1"}
+> ```ocaml
+> let fork _caps = Unix.fork
+> let wait _caps = Unix.wait
+> ```
+>
+> {pause}
+> {.example title="mymodule.ml" style="flex:1"}
+> ```ocaml
+> let restart
+>     (caps : < Cap.fork; Cap.wait; .. >) () =
+>   match CapUnix.fork caps () with
+>   | 0 -> exec_new_version ()
+>   | _ -> ignore (CapUnix.wait caps ())
+> ```
+
+{pause}
+The `.mli` signature does all the enforcement — the implementation
+doesn't even need to touch `caps`.
 
 {pause up}
 # Capability rules
@@ -284,6 +316,13 @@ Same call: ambient authority, low risk, not worth the friction.
 {.block title="Won't every signature explode in size?"}
 Row polymorphism (`..`) — a function only names what it actually
 uses; the rest stays polymorphic.
+
+{pause}
+{.block title="Why object types, not records?"}
+A record needs an *exact* field match. An object's open row (`..`)
+accepts anything with *at least* these fields — so a bigger
+capability set is automatically a [subtype]{.em} of a smaller one, no
+boilerplate.
 
 {pause}
 {.block title="Isn't the space of possible capabilities huge?"}
