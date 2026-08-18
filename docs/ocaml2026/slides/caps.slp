@@ -76,14 +76,25 @@ Now the signature says everything `bar` might do — and nothing it
 can't.
 
 {pause}
-Remember `putStrLn`/`removeFile`/`connect`, all typed `IO ()`? Here
-each carries its danger in the type itself.
-
 {.example}
 ```ocaml
-val delete_file : < Cap.fs; .. > -> string -> unit
-val open_socket : < Cap.network; .. > -> string -> unit
+val print_string : < Cap.stdout; .. >  -> string -> unit
+val delete_file  : < Cap.fs; .. >      -> string -> unit
+val open_socket  : < Cap.network; .. > -> string -> unit
 ```
+
+{pause down}
+We can finally [reason]{.em} about a module — the promise of
+functional programming!
+
+{pause up}
+# Outline
+
+{.outline}
+- Capability types, in detail [abstract types, `Cap.main`, wrappers]{.sub}
+- Capability rules [forbid calls to the dangerous functions of `Stdlib`, `Unix`, `Sys`]{.sub}
+- Experience report [osemgrep, the mmm browser, XiX]{.sub}
+- Related work [eio, cap-std, Pony, Haskell effect systems]{.sub}
 
 {pause up}
 ## Capabilities are abstract types
@@ -267,5 +278,16 @@ sneak past review.
 }
 .em {
   color: red;
+}
+.outline li {
+  font-size: 1.6em;
+  margin-bottom: 40px;
+}
+.outline .sub {
+  display: block;
+  font-size: 0.5em;
+  font-weight: normal;
+  color: #555;
+  margin-top: 6px;
 }
 </style>
