@@ -1,0 +1,17 @@
+{pause down}
+# A pattern I keep seeing
+
+{pause}
+Twenty years ago: explaining strong typing to dynamic-language
+programmers. {pause} Ten years ago: explaining gradual types to PHP
+programmers at Facebook — they're all convinced now. {pause}
+
+{.remark pause}
+Today: explaining capability types to OCaml programmers. Same
+reaction. Some very smart people are still against it.
+
+{pause}
+{.block title="A twist"}
+The original "reasoning is easier" argument was never the killer one —
+**maintenance and refactoring** were. {pause} For capability types, the
+new killer argument is **reviewing AI-generated code**.

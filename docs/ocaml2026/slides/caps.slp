@@ -2,36 +2,24 @@
 dimension: 16:9
 ---
 
-{#title-slip style="text-align:center; display:flex; flex-direction:column; justify-content:center; align-items:center; height:900px; gap:30px"}
-> {style="font-size:2.2em; font-weight:bold; max-width:900px"}
-> A Capability Type System for OCaml
+{#title-slip style="text-align:center; display:flex; flex-direction:column; justify-content:center; align-items:center; height:900px; gap:90px"}
+> {style="display:flex; flex-direction:column; align-items:center; gap:0px"}
+> > {style="font-size:2.2em; font-weight:bold; max-width:900px; margin:0"}
+> > A Capability Type System for OCaml
+> >
+> > {style="font-size:1.3em; color:#555; margin:0"}
+> > or
+> >
+> > {style="font-size:1.3em; color:#555; margin:0"}
+> > a poor man's effect system using an object system
 >
-> {style="font-size:1.3em; color:#555"}
-> a poor man's effect system using an object system
->
-> {style="margin-top:40px; font-size:1.3em"}
-> [Yoann Padioleau]{style="color:#1a5fb4; font-weight:bold"}
->
-> {style="font-size:1.1em; color:#555"}
-> OCaml Workshop 2026 — August 24, 2026
+> {style="display:flex; flex-direction:column; align-items:center; gap:30px"}
+> > {style="font-size:1.3em; margin:0"}
+> > [Yoann Padioleau]{style="color:#1a5fb4; font-weight:bold"}
+> >
+> > {style="font-size:1.1em; color:#555; margin:0"}
+> > [OCaml Workshop 2026]{style="color:red"} — August 24, 2026
 
-{pause down}
-# A pattern I keep seeing
-
-{pause}
-Twenty years ago: explaining strong typing to dynamic-language
-programmers. {pause} Ten years ago: explaining gradual types to PHP
-programmers at Facebook — they're all convinced now. {pause}
-
-{.remark pause}
-Today: explaining capability types to OCaml programmers. Same
-reaction. Some very smart people are still against it.
-
-{pause}
-{.block title="A twist"}
-The original "reasoning is easier" argument was never the killer one —
-**maintenance and refactoring** were. {pause} For capability types, the
-new killer argument is **reviewing AI-generated code**.
 
 {pause up}
 # Motivations
