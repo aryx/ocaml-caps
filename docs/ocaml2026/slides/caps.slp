@@ -37,6 +37,10 @@ What can `foo` do?
 - Open a socket to anywhere on the internet? {pause} [⚠️ Yes.]{.danger} {pause}
 - `fork()` bomb your machine? {pause} [⚠️ Yes.]{.danger}
 
+<!-- -->
+
+<!--said-later: AI make things worse, colleagues too :) -->
+
 {pause}
 The type says nothing. You cannot [reason]{.em} locally about a module.
 
@@ -56,6 +60,10 @@ connect    :: Socket -> SockAddr -> IO ()
 {pause}
 All three return `IO ()`. Printing, destroying data, reaching the
 internet — [coarse-grained]{.em} by default.
+
+{pause}
+Plus, this is an **OCaml workshop** :) — we want an OCaml solution,
+less radical than the imposed purity of Haskell.
 
 {pause up}
 # Capability types
@@ -94,7 +102,29 @@ functional programming!
 - Capability types, in detail [abstract types, `Cap.main`, wrappers]{.sub}
 - Capability rules [forbid calls to the dangerous functions of `Stdlib`, `Unix`, `Sys`]{.sub}
 - Experience report [osemgrep, the mmm browser, XiX]{.sub}
+- FAQ [ambient authority, escape hatches]{.sub}
 - Related work [eio, cap-std, Pony, Haskell effect systems]{.sub}
+
+{pause up}
+## What is a capability?
+
+{.definition}
+An **unforgeable token** that both **designates** a resource and
+**grants the authority** to use it — no reference, no access.
+<!--alt: A **communicable**, **unforgeable** token of authority -->
+
+
+{pause}
+Unix already has one: the **file descriptor**. An int that [designates]{.em}
+an open file and lets you act on it — you cannot [forge]{.em} one, the
+kernel hands it to you.
+
+{pause}
+OCaml too: `in_channel` / `out_channel` (refined!).
+
+{pause}
+Capabilities aren't a new idea — Unix and OCaml already use them.
+This talk just pushes the [discipline]{.em} further.
 
 {pause up}
 ## Capabilities are abstract types
@@ -234,6 +264,37 @@ sneak past review.
   one either. {pause}
 - Stronger types become a **sandbox** around generated code, not just
   documentation.
+
+{pause up}
+# FAQ
+
+Practical compromises — the "less radical than Haskell" part.
+
+{pause}
+{.block title="Doesn't Logs need a capability too?"}
+No — [ambient authority]{.em}, on purpose. Threading a capability
+through every log call would drown signatures in noise for little
+security benefit.
+
+{pause}
+{.block title="What about time, profiling?"}
+Same call: ambient authority, low risk, not worth the friction.
+
+{pause}
+{.block title="Won't every signature explode in size?"}
+Row polymorphism (`..`) — a function only names what it actually
+uses; the rest stays polymorphic.
+
+{pause}
+{.block title="Isn't the space of possible capabilities huge?"}
+Not really — real systems have surprisingly few core syscalls. Plan 9
+has just **39** :) (`fork`, `exec`, `wait`, `read`, `write`, `brk`,
+`alarm`, etc.)
+
+{pause}
+{.block title="What stops UUnix / UStdlib escape hatches?"}
+They exist only for migration — greppable, rare, and they stand out
+in code review.
 
 {pause up}
 # Related work
