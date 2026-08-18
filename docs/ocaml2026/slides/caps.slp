@@ -93,7 +93,7 @@ val bar :
 Now the signature says everything `bar` might do — and nothing it
 can't.
 
-{pause}
+{pause down}
 {.example title="CapStdlib.mli"}
 ```ocaml
 val print_string : < Cap.stdout; .. >  -> string -> unit
@@ -109,7 +109,7 @@ functional programming!
 # Outline
 
 {.outline}
-- Capability types, in detail [abstract types, `Cap.main`, wrappers]{.sub}
+- Capability types, in detail [abstract types, object types, `Cap.main`, wrappers]{.sub}
 - Capability rules [forbid calls to the dangerous functions of `Stdlib`, `Unix`, `Sys`]{.sub}
 - Experience report [osemgrep, the mmm browser, XiX]{.sub}
 - FAQ [ambient authority, escape hatches]{.sub}
@@ -139,11 +139,10 @@ This talk just pushes the [discipline]{.em} further.
 {pause up}
 ## Capabilities are abstract (combining) types
 
-Capabilities are deliberately [fine-grained]{.em} — one per resource;
+Capabilities are deliberately [fine-grained]{.em} — one per syscall;
 [object types]{.em} allows to [combine]{.em} them for free, no OCaml extension
 needed.
 
-{pause}
 {style="display:flex; gap:20px; align-items:flex-start"}
 > {.example title="Cap.mli" style="flex:1"}
 > ```ocaml
@@ -190,9 +189,10 @@ let restart (caps : < Cap.fork; Cap.wait; .. >) () =
 ```
 
 {pause down}
-The `.mli` signature does all the enforcement — the implementation
-doesn't even need to touch `caps`. `CapSys`, `CapStdlib`,
-`CapRandom`, ... do the same, one function at a time.
+The beauty: the OCaml [typechecker]{.em} does all the capability
+checking for us, for free — it even [infers]{.em} capabilities!
+`CapSys`, `CapStdlib`, `CapRandom`, ... do the same, one function at
+a time.
 
 {pause up}
 # But two things are missing
@@ -204,19 +204,54 @@ doesn't even need to touch `caps`. `CapSys`, `CapStdlib`,
 {pause up}
 ## The only door in: `Cap.main`
 
-{.example}
+{.example title="Cap.mli"}
 ```ocaml
-type all_caps =
-  < fork; network; random; stdout; stdin; exit; chdir; ... >
+type all_caps = < process; fs; exec; network; misc >
 
 val main : (all_caps -> 'a) -> 'a
 ```
 
 {pause}
+{style="display:flex; gap:20px; align-items:flex-start"}
+> {.example title="Cap.ml (the powerbox)" style="flex:1"}
+> ```ocaml
+> let powerbox : all_caps =
+>   object
+>     method readdir = ()
+>     method open_in = ()
+>     ...
+>     method fork = ()
+>     method exec = ()
+>     method network = ()
+>   end
+> ```
+>
+> {pause}
+> {.example title="Cap.ml (entry point)" style="flex:1"}
+> ```ocaml
+> let called = ref false
+>
+> let main f =
+>   if !called then
+>     failwith "already called"
+>   else (
+>     called := true;
+>     f powerbox)
+> ```
+
+{pause down}
 - Callable exactly once — checked dynamically. {pause}
 - Hands your entry point **every** capability. {pause}
 - The entry point then **downcasts** (`:>`) to give each callee only
   the subset it needs.
+
+{pause down}
+{.example title="Main.ml"}
+```ocaml
+let () =
+  Cap.main (fun (caps : Cap.all_caps) ->
+    restart (caps :> < Cap.fork; Cap.wait; .. >) ())
+```
 
 {pause up}
 # Capability rules
@@ -323,24 +358,24 @@ Same call: ambient authority, low risk, not worth the friction.
 Row polymorphism (`..`) — a function only names what it actually
 uses; the rest stays polymorphic.
 
-{pause}
+{pause down}
 {.block title="Why object types, not records?"}
 A record needs an *exact* field match. An object's open row (`..`)
 accepts anything with *at least* these fields — so a bigger
 capability set is automatically a [subtype]{.em} of a smaller one, no
 boilerplate.
 
-{pause}
+{pause down}
 I finally found a use case for objects in OCaml :) — notoriously
 unloved, even by OCaml programmers themselves.
 
-{pause}
+{pause down}
 {.block title="Isn't the space of possible capabilities huge?"}
 Not really — real systems have surprisingly few core syscalls. Plan 9
 has just **39** :) (`fork`, `exec`, `wait`, `read`, `write`, `brk`,
 `alarm`, etc.)
 
-{pause}
+{pause down}
 {.block title="What stops UUnix / UStdlib escape hatches?"}
 They exist only for migration — greppable, rare, and they stand out
 in code review.
