@@ -94,7 +94,7 @@ Now the signature says everything `bar` might do — and nothing it
 can't.
 
 {pause down}
-{.example title="CapStdlib.mli"}
+{.example title="src/caps/CapStdlib.mli"}
 ```ocaml
 val print_string : < Cap.stdout; .. >  -> string -> unit
 val delete_file  : < Cap.fs; .. >      -> string -> unit
@@ -144,7 +144,7 @@ Capabilities are deliberately [fine-grained]{.em} — one per syscall and resour
 needed.
 
 {style="display:flex; gap:20px; align-items:flex-start"}
-> {.example title="Cap.mli" style="flex:1"}
+> {.example title="src/caps/Cap.mli" style="flex:1"}
 > ```ocaml
 > module Process : sig
 >   (* abstract: can not be forged *)
@@ -162,7 +162,7 @@ needed.
 >
 > {style="flex:1; display:flex; flex-direction:column; gap:16px"}
 > > {pause}
-> > {.example title="CapUnix.mli"}
+> > {.example title="src/caps/CapUnix.mli"}
 > > ```ocaml
 > > val fork : 
 > >   < Cap.fork; .. > -> unit ->
@@ -173,7 +173,7 @@ needed.
 > > ```
 > >
 > > {pause}
-> > {.example title="CapUnix.ml"}
+> > {.example title="src/caps/CapUnix.ml"}
 > > ```ocaml
 > > let fork _caps = Unix.fork
 > > let wait _caps = Unix.wait
@@ -202,7 +202,7 @@ checking for us, for free — it even [infers]{.em} capabilities!
 {pause up}
 # The only door in: `Cap.main`
 
-{.example title="Cap.mli"}
+{.example title="src/caps/Cap.mli"}
 ```ocaml
 type all_caps = < process; fs; exec; network; misc >
 
@@ -211,7 +211,7 @@ val main : (all_caps -> 'a) -> 'a
 
 {pause}
 {style="display:flex; gap:20px; align-items:flex-start"}
-> {.example title="Cap.ml (the secret)" style="flex:1"}
+> {.example title="src/caps/Cap.ml (the secret)" style="flex:1"}
 > ```ocaml
 > (* not exported in Cap.mli! *)
 > type cap = unit
@@ -273,10 +273,9 @@ Enforce the [discipline]{.em} via a [Semgrep](https://semgrep.dev)
 **capability rule**:
 
 {pause}
-{.example}
+{.example title="rules/forbid_process.jsonnet"}
 ```json
-{
-  id: 'use-caps',
+{ id: 'use-caps',
   match: { any: ['Unix.fork', 'Unix.wait', ...] },
   languages: ['ocaml'],
   severity: 'ERROR',
@@ -296,19 +295,33 @@ syntax).
 {pause up}
 # Going one step further
 
-{.example}
+{.example title="src/tcb/TCB.ml"}
 ```ocaml
-(* TCB.ml, shadows Stdlib *)
+(* TCB.ml (Trusted Computing Base), shadows Stdlib *)
 let open_in = ()
 let open_out = ()
 let exit = ()
 module Obj = struct end   (* no Obj.magic *)
 ```
 
-{pause}
+A consumer project wires this into **every** executable and library
+stanza in its `dune` files:
+
+{.example title="dune"}
+```lisp
+(library
+ (name my_lib)
+ (libraries caps.tcb)
+ (flags (:standard -open TCB)))
+```
+
+{pause down}
 `-open TCB` still opens `Stdlib` underneath, so `TCB.ml` reuses the
 same names and retypes them to `()` — killing the dangerous bindings
 outright, everywhere, for free.
+
+{pause}
+
 
 {pause up}
 # Experience report
@@ -469,5 +482,15 @@ in code review.
   counter-increment: slidenum;
   content: counter(slidenum) ". ";
   color: #999;
+}
+/* .example titles ending in a filename: color .ml blue, leave .mli
+   at the theme's default green. :not([title*=".mli"]) is needed
+   because a ".mli" title also contains the substring ".ml". */
+.example[title*=".ml"]:not([title*=".mli"]) {
+  background-color: #dbeafe;
+  border-color: #1e40af;
+}
+.example[title*=".ml"]:not([title*=".mli"]):before {
+  background-color: #1e40af;
 }
 </style>
