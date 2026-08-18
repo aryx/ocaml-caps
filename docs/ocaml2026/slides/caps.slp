@@ -80,8 +80,14 @@ val bar :
 ```
 
 {pause}
-`< x; .. >` is OCaml's [object type]{.em} syntax — also known as
-[row types]{.em}: "an object with *at least* field `x` (maybe more)."
+`< x; y >` is OCaml's [object type]{.em} syntax — e.g.
+`type shape = < move : int -> int -> unit; area : unit -> float >`.
+
+{pause}
+- Add `..` — `< x; .. >` — for an *open* row: "at least field `x`,
+  maybe more." That's [row polymorphism]{.em}. {pause}
+- Only works in argument position, not in a plain `type` alias like
+  `shape` — exactly where capability signatures live.
 
 {pause}
 Now the signature says everything `bar` might do — and nothing it
