@@ -213,15 +213,21 @@ val main : (all_caps -> 'a) -> 'a
 
 {pause}
 {style="display:flex; gap:20px; align-items:flex-start"}
-> {.example title="Cap.ml (the powerbox)" style="flex:1"}
+> {.example title="Cap.ml (the secret)" style="flex:1"}
 > ```ocaml
+> (* not exported in Cap.mli! *)
+> type cap = unit
+>
+> module Process = struct
+>   type fork = cap
+>   ...
+> end
+>
 > let powerbox : all_caps =
 >   object
 >     method readdir = ()
->     method open_in = ()
->     ...
 >     method fork = ()
->     method exec = ()
+>     ...
 >     method network = ()
 >   end
 > ```
@@ -238,6 +244,10 @@ val main : (all_caps -> 'a) -> 'a
 >     called := true;
 >     f powerbox)
 > ```
+
+{pause}
+Every capability is secretly just `unit` at runtime — the `.mli`
+boundary is the only thing keeping them apart.
 
 {pause down}
 - Callable exactly once — checked dynamically. {pause}
@@ -384,8 +394,11 @@ in code review.
 # Related work
 
 {pause}
-- **eio** (OCaml) — the direct inspiration: effects tracked via
-  capabilities on I/O. {pause}
+- **eio** (OCaml) — the direct inspiration, but its capabilities are
+  tied to a *specific resource instance* (this directory, this
+  socket) — true delegation. `Cap.ml`'s are coarser: an abstract
+  permission flag ("allowed to fork *at all*"), not a handle to one
+  resource. {pause}
 - **cap-std** (Rust) — capability-safe wrappers around the OS,
   removing ambient authority. {pause}
 - **Pony** — reference capabilities baked into the type system
