@@ -109,11 +109,9 @@ functional programming!
 # Outline
 
 {.outline}
-- Capability types, in detail [abstract types, object types, `Cap.main`, wrappers]{.sub}
+- Capability types, in detail [abstract types, object types, `Cap.main`]{.sub}
 - Capability rules [forbid calls to the dangerous functions of `Stdlib`, `Unix`, `Sys`]{.sub}
-- Experience report [osemgrep, the mmm browser, XiX]{.sub}
-- Pros and cons [honest trade-offs]{.sub}
-- FAQ [ambient authority, escape hatches]{.sub}
+- Experience report [osemgrep, the mmm browser, XiX, pros and cons]{.sub}
 - Related work [eio, cap-std, Pony, Haskell effect systems]{.sub}
 
 {pause up}
@@ -265,33 +263,6 @@ let () =
     restart (caps :> < Cap.fork; Cap.wait; .. >) ())
 ```
 
-{pause up}
-# Attenuating capabilities dynamically
-
-Downcasting narrows *statically*. You can also **wrap** an object to
-narrow it *dynamically* — real code, from the `ed` editor in XiX:
-
-{pause}
-{.example title="editor/CLI.ml"}
-```ocaml
-let restrict_caps rflag (x : < caps; .. >) =
-  object
-    method exec =
-      if rflag then Error.e_err "restricted mode on!"
-      else x#exec
-    method open_in file =
-      if rflag && not (Fpath.is_seg file)
-      then Error.e_err "restricted mode on, can't read"
-      else x#open_in file
-    method fork = x#fork
-    method wait = x#wait
-    ...
-  end
-```
-
-{pause}
-A "restricted `ed`" (like `rlogin -x`), one wrapped object away —
-[runtime]{.em} policy layered on top of the static discipline.
 
 {pause up}
 # Capability rules
@@ -322,36 +293,6 @@ No time to explain [Semgrep](https://semgrep.dev) in depth here — I
 actually presented it at this very workshop, back in 2021 :) (though
 things have changed since — `jsonnet` instead of YAML, different
 syntax).
-
-{pause up}
-# Going one step further
-
-{.example title="src/tcb/TCB.ml"}
-```ocaml
-(* TCB.ml (Trusted Computing Base), shadows Stdlib *)
-let open_in = ()
-let open_out = ()
-let exit = ()
-module Obj = struct end   (* no Obj.magic *)
-```
-
-A consumer project wires this into **every** executable and library
-stanza in its `dune` files:
-
-{.example title="dune"}
-```lisp
-(library
- (name my_lib)
- (libraries caps.tcb)
- (flags (:standard -open TCB)))
-```
-
-{pause down}
-`-open TCB` still opens `Stdlib` underneath, so `TCB.ml` reuses the
-same names and retypes them to `()` — killing the dangerous bindings
-outright, everywhere, for free.
-
-{pause}
 
 
 {pause up}
@@ -384,23 +325,20 @@ of the migration even easier.
 >
 > - The [typechecker]{.em} does the enforcement, for free, with type
 >   inference — no runtime cost. {pause}
-> - Plain OCaml: no extension, no PPX, no new runtime. {pause}
-> - Incremental: a handful of annotations + a handful of Semgrep
+> - [Plain OCaml]{.em}: no extension, no PPX, no new runtime. {pause}
+> - Incremental{.em}: a handful of annotations + a handful of Semgrep
 >   rules, not a rewrite. {pause}
 > - **Uncovers issues buried deep in the call stack** — hard to find
 >   otherwise. E.g. a call to `uname` via `Unix.open_process_in`,
 >   added by a junior developer, missed in review, and a performance
 >   bottleneck. {pause}
-> - A quick-and-dirty hack needs a new capability threaded through the
+> - A quick-and-dirty hack (calling a program, abusing `/tmp`, etc.) needs a new capability threaded through the
 >   **whole call chain** — much harder to sneak past review. {pause}
-> - Great discipline for junior colleagues, for the occasional
->   corner-cutting colleague, and — even more so — for AI agents:
->   clear sandboxes, clear folders, clear capabilities.
+> - Finally a use case for objects in OCaml :) {pause}
 >
 > {style="flex:1"}
 > ### Cons
 >
-> {pause}
 > - Still real [effort]{.em}: migrating an existing codebase, writing
 >   and maintaining the `CapXxx` wrapper modules by hand. {pause}
 > - The primitives are coarse permission flags, not a handle to *one*
@@ -408,30 +346,66 @@ of the migration even easier.
 >   be hand-built by wrapping objects, not structural. {pause}
 > - `Cap.ml` alone doesn't stop anyone — needs Semgrep, and Semgrep
 >   rules can be disabled or `nosemgrep`-ed. {pause}
-> - Mostly static — `Cap.main` does have one [dynamic]{.em} check
->   (added this year): it can't be called twice. `Obj.magic` or a C
->   stub can still bypass everything else.
+> - C stub can still bypass everything else.
 
 {pause up}
 # Capabilities and AI coding agents
 
 {pause}
-- Designed *pre*-coding-agent era, for plain software-engineering /
-  architecture goals — to defend against junior colleagues. Even
-  **greater** now, in the AI agent era! {pause}
-- They pick up the capability discipline instantly, no coaching
+- `Cap.ml` designed *pre*-coding-agent era, for plain software-engineering /
+  architecture goals — to defend against junior or corner-cutting colleagues.
+  Even **more useful** now, in the AI agent era! {pause}
+- Agents pick up the capability discipline instantly, no coaching
   needed. {pause}
-- A reviewer can trust the *interface*: if it needs no dangerous
-  capability, the type system guarantees the implementation can't use
+- A reviewer can trust the *interface* (`.mli`): if it needs no dangerous
+  capability, the type system guarantees the implementation (`.ml`) can't use
   one either. {pause}
 - Stronger types become a **sandbox** around generated code, not just
   documentation.
 
 
+
+{pause up}
+# Related work
+
+{pause}
+- **eio** (OCaml) — direct inspiration, but eio is a full IO/fiber
+  runtime for OCaml 5 effects; `Cap.ml` borrows just the capability
+  idea, independent of eio. {pause}
+- Irony: eio itself replaced objects with polymorphic variants in
+  2023 — users found them confusing. Its capabilities are also tied
+  to one *specific resource instance* (true delegation), vs.
+  `Cap.ml`'s coarser abstract permission flags. {pause}
+- **cap-std** (Rust) — capability-safe wrappers around the OS,
+  removing ambient authority. {pause}
+- **Pony** — reference capabilities baked into the type system
+  itself. {pause}
+- **Haskell** — mtl-style typeclasses (`MonadFileSystem`, ...) or
+  effect libraries (`polysemy`, `fused-effects`, `effectful`) can get
+  similar fine-grained tracking, at the cost of extra machinery on
+  top of plain `IO`.
+
+{pause up}
+# Thank you
+
+- `Cap.ml`: <https://github.com/aryx/ocaml-caps>
+- Semgrep: <https://semgrep.dev>
+- eio and the capability idea: <https://roscidus.com/blog/blog/2023/04/26/lambda-capabilities/>
+
+{pause}
+{style="margin-top:50px; font-size:0.65em; color:#777"}
+- **Didn't have time to talk about (see bonus slides after this):**
+- Shadowing the whole `Stdlib` with the TCB
+- Attenuating capabilities dynamically, at runtime
+- Logs and ambient authority
+- Migration escape hatches (`Cap.tmp_caps_UNSAFE ()`)
+- [Semgrep](https://semgrep.dev) itself, in depth
+- OCaml 5 effects, and how they compare
+- Object vs. record performance
+- The mmm browser / XiX case studies, in detail
+
 {pause up}
 # FAQ
-
-Practical compromises — the "less radical than Haskell" part.
 
 {pause}
 {.block title="Doesn't Logs need a capability too?"}
@@ -456,6 +430,13 @@ Actually an advantage: just close over `caps` in the closure you
 pass, exactly like you already do for `in_channel` / `out_channel`.
 
 {pause down}
+{.block title="So how does this compare to Haskell, again?"}
+Finer-grained — a capability per resource, not one big `IO`. {pause}
+But also **less radical**: no need for pure code everywhere. We
+don't track general effects, just [syscalls]{.em} — the dangerous
+stuff.
+
+{pause down}
 {.block title="Why object types, not records?"}
 A record needs an *exact* field match. An object's open row (`..`)
 accepts anything with *at least* these fields — so a bigger
@@ -463,54 +444,70 @@ capability set is automatically a [subtype]{.em} of a smaller one, no
 boilerplate.
 
 {pause down}
-I finally found a use case for objects in OCaml :) — notoriously
-unloved, even by OCaml programmers themselves.
-
-{pause down}
 {.block title="Isn't the space of possible capabilities huge?"}
 Not really — real systems have surprisingly few core syscalls. Plan 9
 has just **39** :) (`fork`, `exec`, `wait`, `read`, `write`, `brk`,
 `alarm`, etc.)
 
-{pause down}
-{.block title="What stops UUnix / UStdlib escape hatches?"}
-They exist only for migration — greppable, rare, and they stand out
-in code review.
-
 {pause up}
-# Related work
+# Going one step further: The TCB
+
+{.example title="src/tcb/TCB.ml"}
+```ocaml
+(* TCB.ml (Trusted Computing Base), shadows Stdlib *)
+let open_in = ()
+let open_out = ()
+let exit = ()
+module Obj = struct end   (* no Obj.magic *)
+```
+
+A consumer project wires this into **every** executable and library
+stanza in its `dune` files:
+
+{.example title="dune"}
+```lisp
+(library
+ (name my_lib)
+ (libraries caps.tcb)
+ (flags (:standard -open TCB)))
+```
+
+{pause down}
+`-open TCB` still opens `Stdlib` underneath, so `TCB.ml` reuses the
+same names and retypes them to `()` — killing the dangerous bindings
+outright, everywhere, for free.
 
 {pause}
-- **eio** (OCaml) — direct inspiration, but eio is a full IO/fiber
-  runtime for OCaml 5 effects; `Cap.ml` borrows just the capability
-  idea, independent of eio. {pause}
-- Irony: eio itself replaced objects with polymorphic variants in
-  2023 — users found them confusing. Its capabilities are also tied
-  to one *specific resource instance* (true delegation), vs.
-  `Cap.ml`'s coarser abstract permission flags. {pause}
-- **cap-std** (Rust) — capability-safe wrappers around the OS,
-  removing ambient authority. {pause}
-- **Pony** — reference capabilities baked into the type system
-  itself. {pause}
-- **Haskell** — mtl-style typeclasses (`MonadFileSystem`, ...) or
-  effect libraries (`polysemy`, `fused-effects`, `effectful`) can get
-  similar fine-grained tracking, at the cost of extra machinery on
-  top of plain `IO`.
+
 
 {pause up}
-# Things I didn't have time to talk about
+# Attenuating capabilities dynamically
 
-- [Semgrep](https://semgrep.dev) itself, in depth {pause}
-- OCaml 5 effects, and how they compare {pause}
-- Performance: objects vs. records, allocation cost {pause}
-- The mmm browser and XiX case studies, in detail
+Downcasting narrows *statically*. You can also **wrap** an object to
+narrow it *dynamically* — real code, from the `ed` editor in XiX:
 
-{pause up}
-# Thank you
+{pause}
+{.example title="editor/CLI.ml"}
+```ocaml
+let restrict_caps rflag (x : < caps; .. >) =
+  object
+    method exec =
+      if rflag then Error.e_err "restricted mode on!"
+      else x#exec
+    method open_in file =
+      if rflag && not (Fpath.is_seg file)
+      then Error.e_err "restricted mode on, can't read"
+      else x#open_in file
+    method fork = x#fork
+    method wait = x#wait
+    ...
+  end
+```
 
-- `Cap.ml`: <https://github.com/aryx/xix/blob/master/lib_core/commons/Cap.ml>
-- Semgrep: <https://semgrep.dev>
-- eio and the capability idea: <https://roscidus.com/blog/blog/2023/04/26/lambda-capabilities/>
+{pause down}
+A "restricted `ed`" (like `rlogin -x`), one wrapped object away —
+[runtime]{.em} policy layered on top of the static discipline.
+
 
 <style>
 /* slipshow's default theme bumps .slide-body to 1.4em but leaves
