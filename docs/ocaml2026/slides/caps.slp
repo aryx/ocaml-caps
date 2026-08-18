@@ -116,7 +116,7 @@ functional programming!
 - Related work [eio, cap-std, Pony, Haskell effect systems]{.sub}
 
 {pause up}
-## What is a capability?
+# What is a capability?
 
 {.definition}
 An **unforgeable token** that both **designates** a resource and
@@ -137,7 +137,7 @@ Capabilities aren't a new idea — Unix and OCaml already use them.
 This talk just pushes the [discipline]{.em} further.
 
 {pause up}
-## Capabilities are abstract (combining) types
+# Capabilities are abstract (combining) types
 
 Capabilities are deliberately [fine-grained]{.em} — one per syscall;
 [object types]{.em} allows to [combine]{.em} them for free, no OCaml extension
@@ -202,7 +202,7 @@ a time.
 - What stops someone from calling `Unix.fork` directly? [enforcement — capability rules]{.sub}
 
 {pause up}
-## The only door in: `Cap.main`
+# The only door in: `Cap.main`
 
 {.example title="Cap.mli"}
 ```ocaml
@@ -288,7 +288,7 @@ Enforce it with a Semgrep **capability rule**:
 ```
 
 {pause up}
-## Going one step further
+# Going one step further
 
 {.example}
 ```ocaml
@@ -321,7 +321,7 @@ Semgrep rules was enough to enforce capabilities across the whole
 codebase.
 
 {pause up}
-## A concrete win
+# A concrete win
 
 {.block title="Found deep in the call stack"}
 While migrating Semgrep, the capability rules flagged a call to the
@@ -330,14 +330,14 @@ junior developer, missed in code review, and a performance
 bottleneck.
 
 {pause up}
-## Why reviewers like it
+# Why reviewers like it
 
 Once a codebase is migrated, a quick-and-dirty hack needs a new
 capability threaded through the **whole call chain** — much harder to
 sneak past review.
 
 {pause up}
-## And for AI coding agents
+# And for AI coding agents
 
 {pause}
 - They pick up the capability discipline instantly, no coaching
@@ -447,5 +447,14 @@ in code review.
   font-weight: normal;
   color: #555;
   margin-top: 6px;
+}
+.slip-body {
+  counter-reset: slidenum;
+}
+.slip-body h1::before,
+.slip-body h2::before {
+  counter-increment: slidenum;
+  content: counter(slidenum) ". ";
+  color: #999;
 }
 </style>
