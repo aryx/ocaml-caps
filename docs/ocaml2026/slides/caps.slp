@@ -112,6 +112,7 @@ functional programming!
 - Capability types, in detail [abstract types, object types, `Cap.main`, wrappers]{.sub}
 - Capability rules [forbid calls to the dangerous functions of `Stdlib`, `Unix`, `Sys`]{.sub}
 - Experience report [osemgrep, the mmm browser, XiX]{.sub}
+- Pros and cons [honest trade-offs]{.sub}
 - FAQ [ambient authority, escape hatches]{.sub}
 - Related work [eio, cap-std, Pony, Haskell effect systems]{.sub}
 
@@ -204,6 +205,8 @@ checking for us, for free — it even [infers]{.em} capabilities!
 
 {.example title="src/caps/Cap.mli"}
 ```ocaml
+type process = < fork : Process.fork; wait : Process.wait; ... >
+...
 type all_caps = < process; fs; exec; network; misc >
 
 val main : (all_caps -> 'a) -> 'a
@@ -261,6 +264,34 @@ let () =
   Cap.main (fun (caps : Cap.all_caps) ->
     restart (caps :> < Cap.fork; Cap.wait; .. >) ())
 ```
+
+{pause up}
+# Attenuating capabilities dynamically
+
+Downcasting narrows *statically*. You can also **wrap** an object to
+narrow it *dynamically* — real code, from the `ed` editor in XiX:
+
+{pause}
+{.example title="editor/CLI.ml"}
+```ocaml
+let restrict_caps rflag (x : < caps; .. >) =
+  object
+    method exec =
+      if rflag then Error.e_err "restricted mode on!"
+      else x#exec
+    method open_in file =
+      if rflag && not (Fpath.is_seg file)
+      then Error.e_err "restricted mode on, can't read"
+      else x#open_in file
+    method fork = x#fork
+    method wait = x#wait
+    ...
+  end
+```
+
+{pause}
+A "restricted `ed`" (like `rlogin -x`), one wrapped object away —
+[runtime]{.em} policy layered on top of the static discipline.
 
 {pause up}
 # Capability rules
@@ -328,37 +359,66 @@ outright, everywhere, for free.
 
 Rolled out on three real codebases:
 
-{pause}
-- **osemgrep** — the OCaml core of Semgrep itself {pause}
-- the **mmm** browser {pause}
-- several **Plan 9** systems programs ported to OCaml in **XiX**: a
-  build system, a shell, a windowing system, a toolchain {pause}
+- **osemgrep** — The OCaml part of Semgrep itself
+- **mmm** — An old experimental Web browser written in OCaml
+- **XiX** — Ports of several **Plan 9** systems programs in OCaml: a
+  build system, a shell, a windowing system, a toolchain
 
 {pause}
 Each time: a handful of capability annotations plus a handful of
 Semgrep rules was enough to enforce capabilities across the whole
 codebase.
 
-{pause up}
-# A concrete win
-
-{.block title="Found deep in the call stack"}
-While migrating Semgrep, the capability rules flagged a call to the
-external `uname` program via `Unix.open_process_in` — added by a
-junior developer, missed in code review, and a performance
-bottleneck.
+{pause}
+Usually just a few [hours]{.em} to migrate a project. And it's
+incremental — migrating forces a better understanding of the
+codebase, and documenting things along the way, which makes the rest
+of the migration even easier.
 
 {pause up}
-# Why reviewers like it
+# Pros and Cons
 
-Once a codebase is migrated, a quick-and-dirty hack needs a new
-capability threaded through the **whole call chain** — much harder to
-sneak past review.
+{style="display:flex; gap:20px; align-items:flex-start"}
+> {style="flex:1"}
+> ### Pros
+>
+> - The [typechecker]{.em} does the enforcement, for free, with type
+>   inference — no runtime cost. {pause}
+> - Plain OCaml: no extension, no PPX, no new runtime. {pause}
+> - Incremental: a handful of annotations + a handful of Semgrep
+>   rules, not a rewrite. {pause}
+> - **Uncovers issues buried deep in the call stack** — hard to find
+>   otherwise. E.g. a call to `uname` via `Unix.open_process_in`,
+>   added by a junior developer, missed in review, and a performance
+>   bottleneck. {pause}
+> - A quick-and-dirty hack needs a new capability threaded through the
+>   **whole call chain** — much harder to sneak past review. {pause}
+> - Great discipline for junior colleagues, for the occasional
+>   corner-cutting colleague, and — even more so — for AI agents:
+>   clear sandboxes, clear folders, clear capabilities.
+>
+> {style="flex:1"}
+> ### Cons
+>
+> {pause}
+> - Still real [effort]{.em}: migrating an existing codebase, writing
+>   and maintaining the `CapXxx` wrapper modules by hand. {pause}
+> - The primitives are coarse permission flags, not a handle to *one*
+>   resource — fine-grained delegation (like eio or `cap-std`) has to
+>   be hand-built by wrapping objects, not structural. {pause}
+> - `Cap.ml` alone doesn't stop anyone — needs Semgrep, and Semgrep
+>   rules can be disabled or `nosemgrep`-ed. {pause}
+> - Mostly static — `Cap.main` does have one [dynamic]{.em} check
+>   (added this year): it can't be called twice. `Obj.magic` or a C
+>   stub can still bypass everything else.
 
 {pause up}
-# And for AI coding agents
+# Capabilities and AI coding agents
 
 {pause}
+- Designed *pre*-coding-agent era, for plain software-engineering /
+  architecture goals — to defend against junior colleagues. Even
+  **greater** now, in the AI agent era! {pause}
 - They pick up the capability discipline instantly, no coaching
   needed. {pause}
 - A reviewer can trust the *interface*: if it needs no dangerous
@@ -366,6 +426,7 @@ sneak past review.
   one either. {pause}
 - Stronger types become a **sandbox** around generated code, not just
   documentation.
+
 
 {pause up}
 # FAQ
@@ -420,11 +481,13 @@ in code review.
 # Related work
 
 {pause}
-- **eio** (OCaml) — the direct inspiration, but its capabilities are
-  tied to a *specific resource instance* (this directory, this
-  socket) — true delegation. `Cap.ml`'s are coarser: an abstract
-  permission flag ("allowed to fork *at all*"), not a handle to one
-  resource. {pause}
+- **eio** (OCaml) — direct inspiration, but eio is a full IO/fiber
+  runtime for OCaml 5 effects; `Cap.ml` borrows just the capability
+  idea, independent of eio. {pause}
+- Irony: eio itself replaced objects with polymorphic variants in
+  2023 — users found them confusing. Its capabilities are also tied
+  to one *specific resource instance* (true delegation), vs.
+  `Cap.ml`'s coarser abstract permission flags. {pause}
 - **cap-std** (Rust) — capability-safe wrappers around the OS,
   removing ambient authority. {pause}
 - **Pony** — reference capabilities baked into the type system
@@ -433,6 +496,14 @@ in code review.
   effect libraries (`polysemy`, `fused-effects`, `effectful`) can get
   similar fine-grained tracking, at the cost of extra machinery on
   top of plain `IO`.
+
+{pause up}
+# Things I didn't have time to talk about
+
+- [Semgrep](https://semgrep.dev) itself, in depth {pause}
+- OCaml 5 effects, and how they compare {pause}
+- Performance: objects vs. records, allocation cost {pause}
+- The mmm browser and XiX case studies, in detail
 
 {pause up}
 # Thank you
