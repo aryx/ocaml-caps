@@ -2,10 +2,6 @@
 %CONFIG:
 %\usepackage{fullpage}
 
-%TODO:
-%- and later use slipshow for the presentation :)
-
-
 \input{../../principia/docs/latex/Packages}
 
 %alt: \input{../latex/Noweb}

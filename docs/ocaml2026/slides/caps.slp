@@ -1,0 +1,230 @@
+---
+dimension: 16:9
+---
+
+{#title-slip style="text-align:center; display:flex; flex-direction:column; justify-content:center; align-items:center; height:900px; gap:30px"}
+> {style="font-size:2.2em; font-weight:bold; max-width:900px"}
+> A Capability Type System for OCaml
+>
+> {style="font-size:1.3em; color:#555"}
+> a poor man's effect system using an object system
+>
+> {style="margin-top:40px; font-size:1.3em"}
+> [Yoann Padioleau]{style="color:#1a5fb4; font-weight:bold"}
+>
+> {style="font-size:1.1em; color:#555"}
+> OCaml Workshop 2026 — August 24, 2026
+
+{pause down}
+# A pattern I keep seeing
+
+{pause}
+Twenty years ago: explaining strong typing to dynamic-language
+programmers. {pause} Ten years ago: explaining gradual types to PHP
+programmers at Facebook — they're all convinced now. {pause}
+
+{.remark pause}
+Today: explaining capability types to OCaml programmers. Same
+reaction. Some very smart people are still against it.
+
+{pause}
+{.block title="A twist"}
+The original "reasoning is easier" argument was never the killer one —
+**maintenance and refactoring** were. {pause} For capability types, the
+new killer argument is **reviewing AI-generated code**.
+
+{pause up}
+# Motivations
+
+{.example}
+```ocaml
+val foo : int -> float
+```
+
+{pause}
+What can `foo` do?
+
+{pause}
+- Delete every file you own? {pause}
+- Open a socket to anywhere on the internet? {pause}
+- `fork()` bomb your machine? {pause}
+
+{pause}
+The type says nothing. You cannot reason locally about a module.
+
+{pause up}
+## Doesn't Haskell solve this?
+
+The `IO` monad forces you to mark effectful code. {pause} But it's
+coarse-grained: printing to stdout and opening a socket get the
+**same type**.
+
+{pause up}
+# Capability types
+
+Inspired by [eio](https://roscidus.com/blog/blog/2023/04/26/lambda-capabilities/),
+generalized with plain OCaml **object types**.
+
+{pause}
+{.example}
+```ocaml
+val bar :
+  < Cap.fork; Cap.network; Cap.stdout; Cap.random; .. > ->
+  int -> float
+```
+
+{pause}
+Now the signature says everything `bar` might do — and nothing it
+can't.
+
+{pause up}
+## Capabilities are abstract types
+
+{.example}
+```ocaml
+module Process : sig
+  type fork   (* abstract: can not be forged *)
+  type exit
+  type chdir
+  ...
+end
+
+type fork = < fork : Process.fork >
+```
+
+{pause}
+Row-typed object types combine them for free — no OCaml extension
+needed.
+
+{pause up}
+## The only door in: `Cap.main`
+
+{.example}
+```ocaml
+type all_caps =
+  < fork; network; random; stdout; stdin; exit; chdir; ... >
+
+val main : (all_caps -> 'a) -> 'a
+```
+
+{pause}
+- Callable exactly once — checked dynamically. {pause}
+- Hands your entry point **every** capability. {pause}
+- The entry point then **downcasts** (`:>`) to give each callee only
+  the subset it needs.
+
+{pause up}
+## Capability-aware wrappers
+
+{.example}
+```ocaml
+let fork (caps : < Cap.fork; .. >) =
+  let _ = caps#fork in
+  Unix.fork
+
+let chdir (caps : < Cap.chdir; .. >) =
+  let _ = caps#chdir in
+  Unix.chdir
+```
+
+{pause}
+`CapUnix`, `CapSys`, `CapStdlib`, `CapRandom`, ... wrap the standard
+library one dangerous function at a time.
+
+{pause up}
+# Capability rules
+
+`Cap.ml` alone doesn't stop anyone from calling `Unix.fork` directly
+instead of `CapUnix.fork`.
+
+{pause}
+Enforce it with a Semgrep **capability rule**:
+
+{pause}
+{.example}
+```json
+{
+  id: 'use-caps',
+  match: { any: ['Unix.fork', 'Unix.wait', ...] },
+  languages: ['ocaml'],
+  severity: 'ERROR',
+  message: |||
+    Do not use Sys.xxx or Unix.xxx directly.
+    Use CapSys or CapUnix and pass the required capability.
+  |||,
+}
+```
+
+{pause up}
+## Going one step further
+
+{.example}
+```ocaml
+(* TCB.ml, shadows Stdlib *)
+let open_in = ()
+let open_out = ()
+let exit = ()
+module Obj = struct end   (* no Obj.magic *)
+```
+
+{pause}
+`-open TCB` still opens `Stdlib` underneath, so `TCB.ml` reuses the
+same names and retypes them to `()` — killing the dangerous bindings
+outright, everywhere, for free.
+
+{pause up}
+# Experience report
+
+Rolled out on three real codebases:
+
+{pause}
+- **osemgrep** — the OCaml core of Semgrep itself {pause}
+- the **mmm** browser {pause}
+- several **Plan 9** systems programs ported to OCaml in **XiX**: a
+  build system, a shell, a windowing system, a toolchain {pause}
+
+{pause}
+Each time: a handful of capability annotations plus a handful of
+Semgrep rules was enough to enforce capabilities across the whole
+codebase.
+
+{pause up}
+## A concrete win
+
+{.block title="Found deep in the call stack"}
+While migrating Semgrep, the capability rules flagged a call to the
+external `uname` program via `Unix.open_process_in` — added by a
+junior developer, missed in code review, and a performance
+bottleneck.
+
+{pause up}
+## Why reviewers like it
+
+Once a codebase is migrated, a quick-and-dirty hack needs a new
+capability threaded through the **whole call chain** — much harder to
+sneak past review.
+
+{pause up}
+## And for AI coding agents
+
+{pause}
+- They pick up the capability discipline instantly, no coaching
+  needed. {pause}
+- A reviewer can trust the *interface*: if it needs no dangerous
+  capability, the type system guarantees the implementation can't use
+  one either. {pause}
+- Stronger types become a **sandbox** around generated code, not just
+  documentation.
+
+{pause up}
+# Thank you
+
+- `Cap.ml`: <https://github.com/aryx/xix/blob/master/lib_core/commons/Cap.ml>
+- Semgrep: <https://semgrep.dev>
+- eio and the capability idea: <https://roscidus.com/blog/blog/2023/04/26/lambda-capabilities/>
+
+<style>
+.example > pre > code, .block > pre > code {
+  font-size: 0.8em;
+}
+</style>
