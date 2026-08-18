@@ -224,6 +224,13 @@ sneak past review.
 - eio and the capability idea: <https://roscidus.com/blog/blog/2023/04/26/lambda-capabilities/>
 
 <style>
+/* slipshow's default theme bumps .slide-body to 1.4em but leaves
+   .slip-body (what a plain flowing deck like this uses) at the base
+   30px, so regular text reads small next to headings/boxes. Apply
+   the same bump here. */
+.slip-body {
+  font-size: 1.3em;
+}
 .example > pre > code, .block > pre > code {
   font-size: 0.8em;
 }
