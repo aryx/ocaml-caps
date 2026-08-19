@@ -346,7 +346,7 @@ of the migration even easier.
 >   be hand-built by wrapping objects, not structural. {pause}
 > - `Cap.ml` alone doesn't stop anyone — needs Semgrep, and Semgrep
 >   rules can be disabled or `nosemgrep`-ed. {pause}
-> - C stub can still bypass everything else.
+> - C stub can still bypass everything else, as well as external libraries
 
 {pause up}
 # Capabilities and AI coding agents
