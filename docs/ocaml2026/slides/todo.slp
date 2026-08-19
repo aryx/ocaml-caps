@@ -15,3 +15,8 @@ reaction. Some very smart people are still against it.
 The original "reasoning is easier" argument was never the killer one —
 **maintenance and refactoring** were. {pause} For capability types, the
 new killer argument is **reviewing AI-generated code**.
+
+#Pro/Cons slide
+> - The primitives are coarse permission flags, not a handle to *one*
+>   resource — fine-grained delegation (like eio or `cap-std`) has to
+>   be hand-built by wrapping objects, not structural. {pause}

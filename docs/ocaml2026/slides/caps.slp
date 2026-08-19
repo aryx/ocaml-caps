@@ -323,7 +323,7 @@ of the migration even easier.
 > {style="flex:1"}
 > ### Pros
 >
-> - The [typechecker]{.em} does the enforcement, for free, with type
+> - The typechecker does the enforcement, for free, with type
 >   inference — no runtime cost. {pause}
 > - [Plain OCaml]{.em}: no extension, no PPX, no new runtime. {pause}
 > - Incremental{.em}: a handful of annotations + a handful of Semgrep
@@ -339,11 +339,8 @@ of the migration even easier.
 > {style="flex:1"}
 > ### Cons
 >
-> - Still real [effort]{.em}: migrating an existing codebase, writing
+> - Still some [effort]{.em}: migrating an existing codebase, writing
 >   and maintaining the `CapXxx` wrapper modules by hand. {pause}
-> - The primitives are coarse permission flags, not a handle to *one*
->   resource — fine-grained delegation (like eio or `cap-std`) has to
->   be hand-built by wrapping objects, not structural. {pause}
 > - `Cap.ml` alone doesn't stop anyone — needs Semgrep, and Semgrep
 >   rules can be disabled or `nosemgrep`-ed. {pause}
 > - C stub can still bypass everything else, as well as external libraries
@@ -355,13 +352,13 @@ of the migration even easier.
 - `Cap.ml` designed *pre*-coding-agent era, for plain software-engineering /
   architecture goals — to defend against junior or corner-cutting colleagues.
   Even **more useful** now, in the AI agent era! {pause}
-- Agents pick up the capability discipline instantly, no coaching
-  needed. {pause}
 - A reviewer can trust the *interface* (`.mli`): if it needs no dangerous
   capability, the type system guarantees the implementation (`.ml`) can't use
   one either. {pause}
 - Stronger types become a **sandbox** around generated code, not just
   documentation.
+- Agents pick up the capability discipline instantly, no coaching
+  needed. {pause}
 
 
 
