@@ -599,6 +599,12 @@ pre.term, pre.term code {
   color: #555;
   margin-top: 6px;
 }
+/* .sub outside {.outline} (e.g. an inline aside in a plain list item) --
+   more specific .outline .sub above still wins inside outline lists. */
+.sub {
+  font-size: 0.7em;
+  color: #777;
+}
 .slip-body {
   counter-reset: slidenum;
 }
