@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ocaml-caps</title>
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+</head>
+<body>
+
+<div class="github-ribbon"><a href="https://github.com/aryx/ocaml-caps">Clone me on GitHub</a></div>
+
+<h1>ocaml-caps</h1>
+<p><em>A capability type system for OCaml &mdash; a poor man's effect system using an object system</em></p>
+
+<p><small>
+<a href="#motivations">Motivations</a> &middot;
+<a href="#capability-types">Capability Types</a> &middot;
+<a href="#capability-rules">Capability Rules</a> &middot;
+<a href="#experience">Experience Report</a> &middot;
+<a href="#related">Related Work</a> &middot;
+<a href="#talk">The Talk</a> &middot;
+<a href="#source">Source Code</a>
+</small></p>
+
+<p>
+<code>Cap.ml</code> is a small library providing <em>capability types</em>
+to use in a disciplined manner the UNIX system calls behind
+standard library functions such as <code>Sys.command</code>,
+<code>Unix.fork</code>, or even <code>Stdlib.open_in</code>.
+When combined with the use of the
+<a href="https://semgrep.dev">Semgrep</a> tool and
+<em>capability rules</em>, it can offer stronger guarantees on a codebase.
+</p>
+
+<hr>
+
+<h2 id="motivations">Motivations</h2>
+
+<p>
+If you look at the interface of a module such as:
+</p>
+<pre><code>val foo: int -&gt; float</code></pre>
+<p>
+what can you say about this function? Can it do dangerous things?
+The OCaml type system offers really no guarantee here. <code>foo()</code>
+could go through your filesystem and delete all your files,
+execute any program, make network requests, or do any system call
+really. You cannot reason locally about a module.
+</p>
+<p>
+Haskell knows this and requires the use of the <code>IO</code> monad
+to <em>perform</em> actions. But Haskell is another language and uses
+coarse granularity: a function making a network request or printing
+on stdout will have a similar signature, <code>IO ()</code>.
+</p>
+
+<h2 id="capability-types">Capability Types</h2>
+
+<p>
+Inspired by the <a href="https://roscidus.com/blog/blog/2023/04/26/lambda-capabilities/">eio</a>
+library, <code>Cap.ml</code> generalizes the idea with plain OCaml
+<em>object types</em> &mdash; no OCaml extension needed. Here is an example:
+</p>
+<pre><code>val bar: &lt; Cap.fork; Cap.network; Cap.stdout; Cap.random; .. &gt; -&gt; int -&gt; float</code></pre>
+<p>
+The type of <code>bar()</code> above indicates that it requires several
+capabilities (<code>Cap.fork</code>, <code>Cap.network</code>, etc.)
+to run. Those capabilities are abstract types defined in
+<code>Cap.mli</code> and cannot be <em>forged</em>:
+</p>
+<pre><code>module Process : sig
+  type fork (* abstract *)
+  type exit (* abstract *)
+  type chdir (* abstract *)
+  ...
+end
+type fork = &lt; fork : Process.fork &gt;</code></pre>
+<p>
+The only function in <code>Cap.mli</code> that can produce values of
+those abstract types is <code>main()</code>:
+</p>
+<pre><code>type all_caps = &lt; fork; network; random; stdout; stdin; exit; chdir; ... &gt;
+val main : (all_caps -&gt; 'a) -&gt; 'a</code></pre>
+<p>
+<code>main()</code> takes a callback, dynamically checks it has not
+already been called, and calls the callback with an object that has
+<em>all</em> the capabilities &mdash; the "powerbox". This callback can
+then <em>downcast</em> this object and pass a subset of those
+capabilities to further functions. The only way to call
+<code>bar()</code> is to obtain the required capabilities by being
+called directly or indirectly from <code>Cap.main()</code> along a
+code path that threads them through; the OCaml type system enforces
+this.
+</p>
+<p>
+Capability types are regular (abstract) OCaml types, combined together
+thanks to the object/row type system of OCaml. <code>Cap.ml</code>
+also contains a set of modules wrapping many standard library
+functions in capability-aware versions, for example:
+</p>
+<pre><code>let fork (caps : &lt; Cap.fork; ..&gt;) =
+  let _ = caps#fork in
+  Unix.fork
+let chdir (caps : &lt; Cap.chdir; ..&gt;) =
+  let _ = caps#chdir in
+  Unix.chdir</code></pre>
+
+<h2 id="capability-rules">Capability Rules</h2>
+
+<p>
+Of course, <code>Cap.ml</code> alone does not prevent programmers from
+calling directly the "unsafe" variant <code>Unix.fork</code> instead of
+<code>CapUnix.fork</code>, which is why it must be coupled with an
+external tool, <a href="https://semgrep.dev">Semgrep</a>, to enforce
+the use of the safe variants. Here is an excerpt of a Semgrep
+configuration file forbidding the use of <code>Unix.fork</code>
+through a <em>capability rule</em>:
+</p>
+<pre><code>local cap_rules = [{
+    id: 'use-caps',
+    match: { any: [ 'Unix.fork', 'Unix.wait', ... ] },
+    languages: ['ocaml'],
+    severity: 'ERROR',
+    message: |||
+       Do not use Sys.xxx or Unix.xxx. Use CapSys or CapUnix and
+       capabilities for dangerous functions.
+    |||,
+  }]</code></pre>
+
+<h2 id="experience">Experience Report</h2>
+
+<p>
+The approach was rolled out on four real codebases, between 20k and
+100k lines each:
+</p>
+<ul>
+<li><strong>Semgrep</strong> &mdash; the original motivation: a growing codebase doing more "system" work (networking, executing programs, etc.), with more (junior) contributors</li>
+<li><strong><a href="https://github.com/aryx/mmm">mmm</a></strong> &mdash; an old experimental web browser written in OCaml</li>
+<li><strong><a href="https://github.com/aryx/efuns">efuns</a></strong> &mdash; an old Emacs clone written in OCaml</li>
+<li><strong><a href="https://github.com/aryx/xix">XiX</a></strong> &mdash; ports of several Plan 9 systems programs in OCaml: a build system, a shell, a windowing system, an assembler/linker/compiler toolchain</li>
+</ul>
+<p>
+Each time, between 50 and 500 capability annotations plus a dozen
+Semgrep rules were enough to enforce capabilities across the whole
+codebase &mdash; most code turns out to be "pure". Migration usually
+took just a few hours, and could be done incrementally.
+</p>
+<p>
+On the Semgrep codebase, the capability rules discovered, deep in the
+call stack, the use of the external program <code>uname</code> via
+<code>Unix.open_process_in</code> (also a performance bottleneck),
+added by a junior programmer that had escaped code review. Once fully
+migrated, the OCaml type system prevented quick-and-dirty hacks:
+using a dangerous function now required modifying the whole call
+chain to pass the necessary capability, which is easy to spot during
+code review.
+</p>
+<p>
+AI coding agents have no trouble learning the capability discipline
+and readily produce code using capability types. Thanks to the
+stronger types, a reviewer can focus on the interfaces and trust,
+thanks to the OCaml type system, that AI-generated code in the
+implementation does not call dangerous functions &mdash; or if it does,
+the interface says so.
+</p>
+
+<h2 id="related">Related Work</h2>
+
+<ul>
+<li><strong>eio</strong> (OCaml) &mdash; direct inspiration, but eio is a full IO/fiber runtime for OCaml 5 effects; <code>Cap.ml</code> borrows just the capability idea, independent of eio</li>
+<li><strong><a href="https://github.com/bytecodealliance/cap-std">cap-std</a></strong> (Rust) &mdash; capability-safe wrappers around the OS, removing ambient authority</li>
+<li><strong>Pony</strong> &mdash; reference capabilities baked into the type system itself</li>
+<li><strong>Haskell</strong> &mdash; mtl-style typeclasses or effect libraries (<code>polysemy</code>, <code>fused-effects</code>, <code>effectful</code>) can achieve similar fine-grained tracking, at the cost of extra machinery on top of plain <code>IO</code></li>
+</ul>
+
+<h2 id="talk">The Talk</h2>
+
+<p>
+<a href="caps.html">A Capability Type System for OCaml</a> &mdash;
+slides presented at the
+<a href="https://ocaml.org/workshops">OCaml Workshop 2026</a>,
+covering the motivations, a tour of the <code>Cap.ml</code> library,
+the experience report above, pros and cons, and related work in more
+detail.
+</p>
+
+<hr>
+
+<h2 id="source">Source Code</h2>
+
+<ul>
+<li><a href="https://github.com/aryx/ocaml-caps">github.com/aryx/ocaml-caps</a> &mdash; the <code>Cap.ml</code> library and this presentation</li>
+</ul>
+
+<hr>
+
+<h2>Credits</h2>
+
+<p>
+ocaml-caps is written by Yoann Padioleau, inspired by
+<a href="https://roscidus.com/blog/blog/2023/04/26/lambda-capabilities/">eio</a>'s
+capability idea.
+</p>
+<p>
+Contact: yoann.padioleau@gmail.com
+</p>
+
+</body>
+</html>
