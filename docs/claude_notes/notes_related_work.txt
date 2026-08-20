@@ -1,0 +1,193 @@
+Related work notes for the "A Capability Type System for OCaml" talk
+(docs/ocaml2026/slides/caps.slp, "Related work" slide)
+======================================================================
+
+Context: for each related-work item (cap-std, eio, Pony, Haskell), a
+concrete code example achieving something similar to `restart` in
+demos/foo.ml -- fork/spawn a new process, wait for it, gated behind an
+explicit capability -- to sanity-check the slide's claims and give
+talk-ready snippets. Researched via WebSearch/WebFetch on 2026-08-20.
+
+Baseline (demos/foo.ml):
+
+    let restart (caps : < Cap.fork; Cap.wait; Cap.exit; .. >) () =
+      match CapUnix.fork caps () with
+      | 0 -> CapStdlib.exit caps 0
+      | _pid -> ignore (CapUnix.wait caps ())
+
+
+----------------------------------------------------------------------
+eio (OCaml) -- closest match, high confidence
+----------------------------------------------------------------------
+No raw fork() (doesn't compose with the scheduler). Capability-gated
+primitive is "spawn a subprocess and wait for it", which is what
+restart is really doing anyway.
+
+    let restart (proc_mgr : _ Eio.Process.mgr) () =
+      Eio.Switch.run @@ fun sw ->
+      let child = Eio.Process.spawn ~sw proc_mgr ["myapp"; "--new-version"] in
+      match Eio.Process.await child with
+      | `Exited 0 -> print_endline "restarted cleanly"
+      | `Exited n -> Printf.printf "child exited with %d\n" n
+      | `Signaled n -> Printf.printf "child killed by signal %d\n" n
+
+    let () =
+      Eio_main.run @@ fun env ->
+      restart (Eio.Stdenv.process_mgr env) ()
+
+Parallel: proc_mgr is the capability (can't spawn without one); the
+only way to get one is Eio.Stdenv.process_mgr env, and env only exists
+inside Eio_main.run -- that's eio's Cap.main.
+
+Verified signatures (ocaml-multicore.github.io/eio):
+  val spawn : sw:Switch.t -> [> 'tag mgr_ty ] Std.r
+    -> ?cwd:Fs.dir_ty Path.t -> ?stdin:_ Flow.source -> ?stdout:_ Flow.sink
+    -> ?stderr:_ Flow.sink -> ?env:string array -> ?executable:string
+    -> string list -> 'tag ty Std.r
+  val run : _ mgr -> ... -> string list -> unit
+  val await : _ t -> exit_status
+
+
+----------------------------------------------------------------------
+Pony -- very close in spirit, medium-high confidence on exact API
+----------------------------------------------------------------------
+Pony's whole type system is capabilities. env.root : AmbientAuth is
+Cap.main; every dangerous constructor needs a narrower *Auth value
+DERIVED from it -- their equivalent of OCaml's `:>` downcast.
+
+    use "process"
+
+    actor Main
+      new create(env: Env) =>
+        try
+          let path = FilePath(FileAuth(env.root), "/bin/myapp")?
+          let sp_auth = StartProcessAuth(env.root)
+          let bp_auth = ApplyReleaseBackpressureAuth(env.root)
+          let notifier: ProcessNotify iso = object iso
+            fun ref dispose(p: ProcessMonitor ref, status: ProcessExitStatus) =>
+              match status
+              | let e: Exited => env.out.print("child exited: " + e.exit_code().string())
+              | let s: Signaled => env.out.print("child signaled: " + s.signal().string())
+              end
+          end
+          match StartProcess(sp_auth, bp_auth, consume notifier, path,
+                              ["myapp"; "--new-version"], [])
+          | let pm: ProcessMonitor => None // running; dispose() fires on exit
+          | let err: ProcessError => env.out.print("failed to start")
+          end
+        else
+          env.out.print("no ambient auth")
+        end
+
+StartProcessAuth(env.root) does exactly what
+(caps :> < Cap.fork; Cap.wait; .. >) does in the slide's Main.ml --
+narrows root authority to just what this call needs.
+
+Verified via ponylang/ponyc source + stdlib docs:
+  ProcessMonitor actor "forks/execs and creates a child process and
+  monitors it". ProcessMonitorAuth = (AmbientAuth | StartProcessAuth).
+  StartProcess(sp_auth, bp_auth, notifier, path, args, vars) returns
+  (ProcessMonitor | ProcessError).
+  _create constructor (internal, called by StartProcess):
+    new _create(backpressure_auth: ApplyReleaseBackpressureAuth,
+      notifier: ProcessNotify iso, child: _Process iso, stdin: _Pipe iso,
+      stdout: _Pipe iso, stderr: _Pipe iso, err: _Pipe iso)
+  Derived-authority pattern (e.g. TCPConnectAuth(env.root)) confirmed
+  via tutorial.ponylang.io/object-capabilities/derived-authority.html.
+  NOTE: did not verify FilePath's exact constructor signature or the
+  full ProcessNotify method set against current stdlib -- double check
+  before using this snippet verbatim in a live demo.
+
+
+----------------------------------------------------------------------
+Haskell (capability-library style) -- illustrative, NOT a real package
+----------------------------------------------------------------------
+No shipped "HasProcess" or "MonadFork"-for-subprocesses class exists.
+MonadFileSystem (mentioned on the slide) is likewise not a real
+package -- it's the standard *teaching example* used in monad-mock and
+HMock's own docs to explain mtl-style mocking, nothing more.
+
+Hand-written in the tweag/capability library's style (HasX classes):
+
+    class Monad m => HasProcess m where
+      spawnAndWait :: FilePath -> [String] -> m ExitCode
+
+    instance MonadIO m => HasProcess m where
+      spawnAndWait exe args = liftIO $ do
+        (_, _, _, ph) <- createProcess (proc exe args)
+        waitForProcess ph
+
+    restart :: HasProcess m => m ()
+    restart = spawnAndWait "myapp" ["--new-version"] >>= \case
+      ExitSuccess   -> pure ()
+      ExitFailure n -> error ("child exited with " <> show n)
+
+`HasProcess m => m ()` mirrors `< Cap.fork; Cap.wait; .. > -> unit` --
+the constraint IS the capability set -- BUT there is no Cap.main-style
+single door in: any IO-capable monad satisfies the instance above, so
+nothing stops writing your own instance and skipping the discipline
+entirely. Real, honest weak point vs Cap.ml worth keeping on the slide.
+
+Related but distinct things found while researching (real packages):
+  - monad-fork / forkable-monad: DO exist on Hackage, but wrap GHC's
+    forkIO (green thread), not POSIX fork(2). Different danger profile
+    -- closer to Cap.thread/Cap.domain than Cap.fork. Don't conflate.
+  - tweag/capability (github.com/tweag/capability, hackage: capability):
+    THE actually-relevant Haskell related-work item, much closer than
+    generic mtl/polysemy. Explicitly framed as "a capability is a type
+    class that says explicitly which effects a function is allowed to
+    use." Decouples effect from implementation (unlike mtl, which
+    disambiguates by the type of state/exception -- awkward for
+    multiple state effects). Uses DerivingVia + ReaderT pattern instead
+    of a transformer stack or free-monad interpreter, so it's close to
+    zero-cost like Cap.ml, unlike polysemy's interpreter machinery.
+    -> Suggested slide edit: replace/augment the generic "Haskell --
+       mtl-style typeclasses (MonadFileSystem, ...) or effect libraries
+       (polysemy, fused-effects, effectful)" bullet with a direct
+       pointer to tweag/capability by name. NOT YET APPLIED to caps.slp
+       -- ask before editing.
+
+
+----------------------------------------------------------------------
+cap-std (Rust) -- correction, not an example
+----------------------------------------------------------------------
+IMPORTANT: cap-std deliberately does NOT provide subprocess spawning
+at all. Its README scopes it to filesystem/network/time only -- no
+mention of std::process::Command anywhere. This is a design stance,
+not a gap: spawning hands the child near-unbounded ambient authority
+(argv, envp, fresh fd table, can exec anything on $PATH), which doesn't
+fit cap-std's "handle that provably can't exceed its scope" model.
+Cap.ml takes the opposite, more permissive stance: it DOES gate
+fork/exec, with a coarser guarantee ("you were allowed to call this",
+not "you provably can't exceed X").
+
+Real cap-std example instead (its actual bread and butter -- a
+directory handle scoped to one subtree, symlink-escape-proof):
+
+    use cap_std::fs::Dir;
+
+    fn restart(dir: &Dir) -> std::io::Result<()> {
+        dir.write("restart.log", b"restarting...\n")
+    }
+
+Framing for the slide: this is a genuine three-vs-one split worth
+stating explicitly rather than glossing over -- Cap.ml, eio, and Pony
+all gate process spawning behind a capability; cap-std draws its line
+before that and only covers fs/net/time.
+
+
+----------------------------------------------------------------------
+Sources
+----------------------------------------------------------------------
+- https://ocaml-multicore.github.io/eio/eio/Eio/Process/index.html
+- https://github.com/ponylang/ponyc/blob/main/packages/process/process_monitor.pony
+- https://stdlib.ponylang.io/process--index/
+- https://tutorial.ponylang.io/object-capabilities/derived-authority.html
+- https://github.com/bytecodealliance/cap-std
+- https://github.com/tweag/capability
+- https://www.tweag.io/blog/2018-10-04-capability/
+- https://hackage.haskell.org/package/capability
+- https://hackage.haskell.org/package/monad-mock
+- https://hackage.haskell.org/package/HMock-0.1.0.1/docs/Test-HMock.html
+- https://hackage.haskell.org/package/monad-fork
+- https://hackage.haskell.org/package/forkable-monad
