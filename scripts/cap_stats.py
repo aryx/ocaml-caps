@@ -85,6 +85,20 @@ UNRESOLVED_ALIAS = "caps_unresolved"
 SOURCE_SUFFIXES = (".ml", ".mli")
 EXCLUDED_DIR_NAMES = {"_build", ".git"}
 
+GITMODULES_PATH_RE = re.compile(r"^\s*path\s*=\s*(.+?)\s*$", re.MULTILINE)
+
+
+def submodule_dirs(root: Path) -> set:
+    """Top-level directories declared as git submodules in root/.gitmodules
+    (e.g. shared libraries like semgrep-pfff-libs/semgrep-pfff-langs,
+    vendored into several sibling projects) -- excluded by default so
+    stats reflect a project's own code, not code it merely embeds."""
+    gitmodules = root / ".gitmodules"
+    if not gitmodules.is_file():
+        return set()
+    text = gitmodules.read_text(errors="replace")
+    return {root / p for p in GITMODULES_PATH_RE.findall(text)}
+
 
 def strip_noise(text: str) -> str:
     """Blank out comments and string literals (replacing their contents
@@ -293,11 +307,14 @@ def scan_file(path: Path) -> FileStats:
     return stats
 
 
-def iter_source_files(root: Path):
+def iter_source_files(root: Path, skip_submodules: bool = True):
+    excluded_dirs = submodule_dirs(root) if skip_submodules else set()
     for path in sorted(root.rglob("*")):
         if path.is_dir():
             continue
         if any(part in EXCLUDED_DIR_NAMES for part in path.parts):
+            continue
+        if excluded_dirs and any(sub == path or sub in path.parents for sub in excluded_dirs):
             continue
         if path.suffix in SOURCE_SUFFIXES:
             yield path
@@ -308,16 +325,18 @@ def top_level_bucket(root: Path, path: Path) -> str:
     return rel.parts[0] if len(rel.parts) > 1 else "(root)"
 
 
-def collect(root: Path):
+def collect(root: Path, skip_submodules: bool = True):
     """Return (per_directory: dict[str, FileStats], total: FileStats).
 
     Two passes: first build a tree-wide alias index (so e.g. "Shell.caps"
     used in one file resolves against "type caps = < ... >" defined in
-    Shell.ml), then scan every file against that shared index.
+    Shell.ml), then scan every file against that shared index. Git
+    submodules (per .gitmodules) are skipped by default -- a project's
+    stats should reflect its own code, not code it merely vendors.
     """
     files = {}  # path -> (text, clean, module, spans)
     raw_defs = {}
-    for f in iter_source_files(root):
+    for f in iter_source_files(root, skip_submodules):
         text = f.read_text(errors="replace")
         clean = strip_noise(text)
         module = module_name_of(f)
@@ -441,6 +460,9 @@ def main(argv=None):
     parser.add_argument("--summary-only", action="store_true",
                          help="with multiple roots, skip the per-directory breakdowns and print only "
                               "the one-row-per-project comparison table")
+    parser.add_argument("--include-submodules", action="store_true",
+                         help="also scan directories declared as git submodules in .gitmodules "
+                              "(skipped by default, e.g. shared libs vendored into several projects)")
     parser.set_defaults(fmt="text")
     args = parser.parse_args(argv)
 
@@ -452,7 +474,7 @@ def main(argv=None):
         if not root.is_dir():
             print(f"error: {root} is not a directory", file=sys.stderr)
             return 1
-        per_dir, total = collect(root)
+        per_dir, total = collect(root, skip_submodules=not args.include_submodules)
         if not (args.summary_only and len(args.roots) > 1):
             print_report(str(root), per_dir, total, args.fmt, sys.stdout)
         roots_totals.append((label, total))

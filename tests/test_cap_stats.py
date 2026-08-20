@@ -12,6 +12,7 @@ import cap_stats  # noqa: E402
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 CROSSFILE_FIXTURES = Path(__file__).resolve().parent / "fixtures_crossfile"
+SUBMODULE_FIXTURES = Path(__file__).resolve().parent / "fixtures_submodule"
 
 
 class TestScanFile(unittest.TestCase):
@@ -152,6 +153,25 @@ class TestCrossFileResolution(unittest.TestCase):
         per_dir, total = cap_stats.collect(CROSSFILE_FIXTURES)
         self.assertEqual(total.cap_counts["Cap.draw"], 2)  # efuns.ml's own def + frame.ml's use
         self.assertEqual(total.cap_counts["Cap.keyboard"], 2)
+
+
+class TestSubmodules(unittest.TestCase):
+    def test_submodule_skipped_by_default(self):
+        per_dir, total = cap_stats.collect(SUBMODULE_FIXTURES)
+        self.assertEqual(dict(total.cap_counts), {"Cap.chdir": 1})
+        self.assertNotIn("vendored_lib", per_dir)
+
+    def test_submodule_included_when_asked(self):
+        per_dir, total = cap_stats.collect(SUBMODULE_FIXTURES, skip_submodules=False)
+        self.assertEqual(dict(total.cap_counts), {"Cap.chdir": 1, "Cap.network": 1, "Cap.exec": 1})
+        self.assertIn("vendored_lib", per_dir)
+
+    def test_submodule_dirs_parses_gitmodules(self):
+        dirs = cap_stats.submodule_dirs(SUBMODULE_FIXTURES)
+        self.assertEqual(dirs, {SUBMODULE_FIXTURES / "vendored_lib"})
+
+    def test_no_gitmodules_file_means_no_exclusions(self):
+        self.assertEqual(cap_stats.submodule_dirs(FIXTURES), set())
 
 
 if __name__ == "__main__":
