@@ -7,7 +7,8 @@
  * this for us, for free.
  *)
 
-let restart (caps : < Cap.fork; Cap.wait; Cap.exit; .. >) () =
+(* alt: let restart (caps : < Cap.fork; (*Cap.wait;*) Cap.exit; ..  >) () = *)
+let restart caps () =
   match CapUnix.fork caps () with
   | 0 ->
       print_endline "[child] pretending to exec a new version...";
@@ -26,4 +27,6 @@ let restart (caps : < Cap.fork; Cap.wait; Cap.exit; .. >) () =
  * subset it actually needs. *)
 let () =
   Cap.main (fun (caps : Cap.all_caps) ->
-      restart (caps :> < Cap.fork; Cap.wait; Cap.exit; .. >) ())
+      (* alt: restart (caps :> < Cap.fork; Cap.wait; Cap.exit; .. >) ()) *)
+      restart caps ()
+  )
