@@ -17,9 +17,15 @@ These can span multiple lines and may contain comments, e.g.:
         Cap.open_out; (* for 'w' *)
       >
 
-"caps" alone (no "Cap." prefix) is treated as a capability alias
-(a bundle of capabilities defined elsewhere via "type caps = < ... >"),
-and is counted separately from individual "Cap.xxx" capabilities.
+"caps" alone (no "Cap." prefix) is a capability alias, a bundle of
+capabilities defined via "type caps = < ... >". When that definition
+is found locally in the same file, each "caps" usage is *expanded*:
+its component capabilities are counted individually, folded into the
+same Cap.xxx totals as direct uses. When no local definition can be
+found (e.g. "type caps = Other_module.caps", or no definition at all
+in that file), the use is tallied under "caps_unresolved" instead of
+being silently dropped, so you can see how much of the total is
+missing an expansion.
 
 Usage:
     scripts/cap_stats.py [--csv] <root_dir> [<root_dir2> ...]
@@ -30,6 +36,7 @@ total across all roots.
 """
 import argparse
 import re
+import statistics
 import sys
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -54,6 +61,23 @@ CAP_BLOCK_RE = re.compile(
 
 CAP_NAME_RE = re.compile(r"Cap\.([A-Za-z_][A-Za-z0-9_']*)")
 CAPS_ALIAS_RE = re.compile(r"\bcaps\b")
+
+# A local "type caps = < ... >" definition, e.g.:
+#   type caps = < Cap.open_in; Cap.open_out; Cap.env >
+#   type caps = <
+#       Cap.stdin; Cap.stdout; ...
+#     >
+# Used to expand bare "caps" usages (< caps; Cap.stdout; .. >) into their
+# individual components when the alias is defined in the same file. Not
+# matched when the alias just re-exports another module's type, e.g.
+# "type caps = Cmd_.caps" (no "<" follows) -- that case is left
+# unresolved since it needs cross-file/module resolution.
+TYPE_CAPS_DEF_RE = re.compile(
+    rf"\btype\s+caps\s*=\s*(<(?=[^>]*?{CAP_ITEM}){_TOKEN}*>)",
+    re.DOTALL,
+)
+
+UNRESOLVED_ALIAS = "caps_unresolved"
 
 SOURCE_SUFFIXES = (".ml", ".mli")
 EXCLUDED_DIR_NAMES = {"_build", ".git"}
@@ -109,34 +133,74 @@ def strip_noise(text: str) -> str:
 
 
 class FileStats:
-    __slots__ = ("loc", "annotations", "cap_counts")
+    __slots__ = ("loc", "annotations", "cap_counts", "block_sizes")
 
     def __init__(self):
         self.loc = 0
         self.annotations = 0
         self.cap_counts = Counter()
+        # Number of capability items in each individual "< ... >" block
+        # (bare "caps" counts as its expanded size when resolved, else 1),
+        # one entry per annotation -- used for min/max/mean/median.
+        self.block_sizes = []
 
     def add(self, other):
         self.loc += other.loc
         self.annotations += other.annotations
         self.cap_counts.update(other.cap_counts)
+        self.block_sizes.extend(other.block_sizes)
+
+
+def local_caps_alias(clean_text: str):
+    """Return the list of "Cap.xxx" names in this file's local
+    "type caps = < ... >" definition, or None if there isn't one (e.g.
+    the file has no such definition, or it's a re-export like
+    "type caps = Cmd_.caps" that this text-based scanner can't resolve).
+    """
+    m = TYPE_CAPS_DEF_RE.search(clean_text)
+    if not m:
+        return None
+    return [f"Cap.{n}" for n in CAP_NAME_RE.findall(m.group(1))]
 
 
 def scan_text(text: str) -> FileStats:
     stats = FileStats()
     clean = strip_noise(text)
+    alias = local_caps_alias(clean)
+    def_block = TYPE_CAPS_DEF_RE.search(clean)
+    def_span = def_block.span(1) if def_block else None
+
     for block in CAP_BLOCK_RE.finditer(clean):
         block_text = block.group(0)
         stats.annotations += 1
+        block_size = 0
         for m in CAP_NAME_RE.finditer(block_text):
             stats.cap_counts[f"Cap.{m.group(1)}"] += 1
-        # Count bare "caps" alias occurrences, excluding the "caps" that
-        # is part of "Cap.xxx" matches (CAP_NAME_RE already consumed
-        # those separately; CAPS_ALIAS_RE only matches standalone words
-        # so "Cap.stdout" does not also match "\bcaps\b").
-        alias_count = len(CAPS_ALIAS_RE.findall(block_text))
+            block_size += 1
+
+        # Bare "caps" alias occurrences (excluding "caps" as part of a
+        # "Cap.xxx" token, which CAP_NAME_RE already handled above;
+        # CAPS_ALIAS_RE only matches the standalone word). Skip the
+        # definition block itself -- it doesn't reference its own alias.
+        is_def_block = def_span is not None and block.span() == def_span
+        alias_count = 0 if is_def_block else len(CAPS_ALIAS_RE.findall(block_text))
         if alias_count:
-            stats.cap_counts["caps (alias)"] += alias_count
+            if alias is not None:
+                # Expand: each "caps" use pulls in every component
+                # capability of the locally-defined alias.
+                for _ in range(alias_count):
+                    for name in alias:
+                        stats.cap_counts[name] += 1
+                    block_size += len(alias)
+            else:
+                # No local "type caps = < ... >" found in this file -- we
+                # can't tell what "caps" expands to, so tally it
+                # separately rather than silently under-counting, and
+                # conservatively count it as a single item for the
+                # per-annotation size distribution.
+                stats.cap_counts[UNRESOLVED_ALIAS] += alias_count
+                block_size += alias_count
+        stats.block_sizes.append(block_size)
     return stats
 
 
@@ -179,28 +243,56 @@ def ratio_per_kloc(count: int, loc: int) -> str:
     return f"{count * 1000 / loc:.2f}"
 
 
-def print_report(label: str, per_dir, total, csv: bool, out):
-    if csv:
-        w = out
-        for d in sorted(per_dir):
-            fs = per_dir[d]
-            w.write(f"{label},{d},{fs.loc},{fs.annotations},"
-                     f"{sum(fs.cap_counts.values())},{ratio_per_kloc(sum(fs.cap_counts.values()), fs.loc)}\n")
-        w.write(f"{label},TOTAL,{total.loc},{total.annotations},"
-                f"{sum(total.cap_counts.values())},{ratio_per_kloc(sum(total.cap_counts.values()), total.loc)}\n")
+def size_stats(block_sizes):
+    """(min, max, mean, median) capability items per annotation, as
+    display strings; "n/a" for all four when there are no annotations."""
+    if not block_sizes:
+        return "n/a", "n/a", "n/a", "n/a"
+    return (
+        str(min(block_sizes)),
+        str(max(block_sizes)),
+        f"{statistics.mean(block_sizes):.2f}",
+        f"{statistics.median(block_sizes):.2f}",
+    )
+
+
+def row_fields(name: str, fs: "FileStats"):
+    uses = sum(fs.cap_counts.values())
+    mn, mx, mean, median = size_stats(fs.block_sizes)
+    return [name, str(fs.loc), str(fs.annotations), str(uses),
+            ratio_per_kloc(uses, fs.loc), mn, mx, mean, median]
+
+
+TABLE_COLUMNS = ["directory", "LOC", "annotations", "cap uses", "uses/KLOC", "min", "max", "mean", "median"]
+
+
+def print_report(label: str, per_dir, total, fmt: str, out):
+    rows = [row_fields(d, per_dir[d]) for d in sorted(per_dir, key=lambda d: -sum(per_dir[d].cap_counts.values()))]
+    rows.append(row_fields("TOTAL", total))
+
+    if fmt == "csv":
+        out.write("label," + ",".join(c.lower().replace(" ", "_").replace("/", "_per_") for c in TABLE_COLUMNS) + "\n")
+        for row in rows:
+            out.write(f"{label}," + ",".join(row) + "\n")
         return
 
-    out.write(f"\n=== {label} ===\n")
-    header = f"{'directory':<20} {'LOC':>8} {'annotations':>12} {'cap uses':>9} {'uses/KLOC':>10}"
-    out.write(header + "\n")
-    out.write("-" * len(header) + "\n")
-    for d in sorted(per_dir, key=lambda d: -sum(per_dir[d].cap_counts.values())):
-        fs = per_dir[d]
-        uses = sum(fs.cap_counts.values())
-        out.write(f"{d:<20} {fs.loc:>8} {fs.annotations:>12} {uses:>9} {ratio_per_kloc(uses, fs.loc):>10}\n")
-    out.write("-" * len(header) + "\n")
-    uses = sum(total.cap_counts.values())
-    out.write(f"{'TOTAL':<20} {total.loc:>8} {total.annotations:>12} {uses:>9} {ratio_per_kloc(uses, total.loc):>10}\n")
+    if fmt == "markdown":
+        out.write(f"\n**{label}**\n\n")
+        out.write("| " + " | ".join(TABLE_COLUMNS) + " |\n")
+        out.write("|" + "|".join("---" if i == 0 else "---:" for i in range(len(TABLE_COLUMNS))) + "|\n")
+        for row in rows:
+            out.write("| " + " | ".join(row) + " |\n")
+        out.write("\n(min/max/mean/median = capability items per individual `< ... >` annotation)\n")
+    else:
+        out.write(f"\n=== {label} ===\n")
+        widths = [20, 8, 12, 9, 10, 4, 4, 6, 7]
+        header = " ".join(c.rjust(w) if i else c.ljust(w) for i, (c, w) in enumerate(zip(TABLE_COLUMNS, widths)))
+        out.write(header + "\n")
+        out.write("-" * len(header) + "\n")
+        for row in rows:
+            out.write(" ".join(v.rjust(w) if i else v.ljust(w) for i, (v, w) in enumerate(zip(row, widths))) + "\n")
+        out.write("-" * len(header) + "\n")
+        out.write("(min/max/mean/median = capability items per individual < ... > annotation)\n")
 
     if total.cap_counts:
         out.write(f"\nCapability breakdown for {label}:\n")
@@ -208,14 +300,48 @@ def print_report(label: str, per_dir, total, csv: bool, out):
             out.write(f"  {name:<20} {count:>6}\n")
 
 
+def print_summary(roots_totals, fmt: str, out):
+    """One row per project (root), for cross-project comparison tables."""
+    cols = ["project", "LOC", "annotations", "cap uses", "uses/KLOC", "min", "max", "mean", "median"]
+    rows = [row_fields(name, fs) for name, fs in roots_totals]
+
+    if fmt == "csv":
+        out.write(",".join(c.lower().replace(" ", "_").replace("/", "_per_") for c in cols) + "\n")
+        for row in rows:
+            out.write(",".join(row) + "\n")
+        return
+
+    if fmt == "markdown":
+        out.write("\n**Capability usage by project**\n\n")
+        out.write("| " + " | ".join(cols) + " |\n")
+        out.write("|" + "|".join("---" if i == 0 else "---:" for i in range(len(cols))) + "|\n")
+        for row in rows:
+            out.write("| " + " | ".join(row) + " |\n")
+        return
+
+    out.write("\n=== Capability usage by project ===\n")
+    widths = [20, 8, 12, 9, 10, 4, 4, 6, 7]
+    header = " ".join(c.rjust(w) if i else c.ljust(w) for i, (c, w) in enumerate(zip(cols, widths)))
+    out.write(header + "\n")
+    out.write("-" * len(header) + "\n")
+    for row in rows:
+        out.write(" ".join(v.rjust(w) if i else v.ljust(w) for i, (v, w) in enumerate(zip(row, widths))) + "\n")
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("roots", nargs="+", type=Path, help="root directories to scan (e.g. ~/xix)")
-    parser.add_argument("--csv", action="store_true", help="emit CSV instead of a text table")
+    fmt_group = parser.add_mutually_exclusive_group()
+    fmt_group.add_argument("--csv", action="store_const", dest="fmt", const="csv", help="emit CSV instead of a text table")
+    fmt_group.add_argument("--markdown", action="store_const", dest="fmt", const="markdown",
+                            help="emit a pandoc-style pipe table (handy for slides/docs)")
+    parser.add_argument("--summary-only", action="store_true",
+                         help="with multiple roots, skip the per-directory breakdowns and print only "
+                              "the one-row-per-project comparison table")
+    parser.set_defaults(fmt="text")
     args = parser.parse_args(argv)
 
-    grand_per_dir = defaultdict(FileStats)
-    grand_total = FileStats()
+    roots_totals = []
 
     for root in args.roots:
         root = root.expanduser().resolve()
@@ -223,13 +349,12 @@ def main(argv=None):
             print(f"error: {root} is not a directory", file=sys.stderr)
             return 1
         per_dir, total = collect(root)
-        print_report(str(root), per_dir, total, args.csv, sys.stdout)
-        for d, fs in per_dir.items():
-            grand_per_dir[f"{root.name}/{d}"].add(fs)
-        grand_total.add(total)
+        if not (args.summary_only and len(args.roots) > 1):
+            print_report(str(root), per_dir, total, args.fmt, sys.stdout)
+        roots_totals.append((root.name, total))
 
     if len(args.roots) > 1:
-        print_report("GRAND TOTAL (all roots)", grand_per_dir, grand_total, args.csv, sys.stdout)
+        print_summary(roots_totals, args.fmt, sys.stdout)
 
     return 0
 
