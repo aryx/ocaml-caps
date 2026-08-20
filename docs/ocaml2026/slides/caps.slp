@@ -448,14 +448,15 @@ codebase, and **documenting** things along the way, and
 {pause}
 {style="margin-top:50px; font-size:0.65em; color:#777"}
 - **Didn't have time to talk about (see bonus slides after this):**
-- Shadowing the whole `Stdlib` with the TCB
+- Shadowing the whole `Stdlib` with `src/tcb/TCB.ml`
 - Attenuating capabilities dynamically, at runtime
 - Logs and ambient authority
 - Migration escape hatches (`Cap.tmp_caps_UNSAFE ()`)
-- [Semgrep](https://semgrep.dev) itself, in depth
+- FAQ
+- [Semgrep](https://semgrep.dev) itself
 - OCaml 5 effects, and how they compare
 - Object vs. record performance
-- The mmm browser / XiX case studies, in detail
+- The mmm browser / efuns / semgrep / XiX case studies, in detail
 
 {pause up}
 # FAQ
@@ -514,7 +515,7 @@ let exit = ()
 module Obj = struct end   (* no Obj.magic *)
 ```
 
-A consumer project wires this into **every** executable and library
+A consumer project simply wires this into executable and library
 stanza in its `dune` files:
 
 {.example title="dune"}
@@ -539,7 +540,6 @@ outright, everywhere, for free.
 Downcasting narrows *statically*. You can also **wrap** an object to
 narrow it *dynamically* — real code, from the `ed` editor in XiX:
 
-{pause}
 {.example title="editor/CLI.ml"}
 ```ocaml
 let restrict_caps rflag (x : < caps; .. >) =
@@ -560,6 +560,9 @@ let restrict_caps rflag (x : < caps; .. >) =
 {pause down}
 A "restricted `ed`" (like `rlogin -x`), one wrapped object away —
 [runtime]{.em} policy layered on top of the static discipline.
+
+{pause up}
+# That's all folks
 
 
 <style>
