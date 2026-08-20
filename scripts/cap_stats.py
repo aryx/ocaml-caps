@@ -343,15 +343,16 @@ def main(argv=None):
 
     roots_totals = []
 
-    for root in args.roots:
-        root = root.expanduser().resolve()
+    for root_arg in args.roots:
+        label = root_arg.expanduser().name  # as typed, before resolving symlinks
+        root = root_arg.expanduser().resolve()
         if not root.is_dir():
             print(f"error: {root} is not a directory", file=sys.stderr)
             return 1
         per_dir, total = collect(root)
         if not (args.summary_only and len(args.roots) > 1):
             print_report(str(root), per_dir, total, args.fmt, sys.stdout)
-        roots_totals.append((root.name, total))
+        roots_totals.append((label, total))
 
     if len(args.roots) > 1:
         print_summary(roots_totals, args.fmt, sys.stdout)
