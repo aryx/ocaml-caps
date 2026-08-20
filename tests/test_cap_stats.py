@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 import cap_stats  # noqa: E402
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
+CROSSFILE_FIXTURES = Path(__file__).resolve().parent / "fixtures_crossfile"
 
 
 class TestScanFile(unittest.TestCase):
@@ -52,13 +53,19 @@ class TestScanFile(unittest.TestCase):
         self.assertEqual(self.sizes("dir_a/multiline.ml"), [5, 5, 7])
 
     def test_unresolved_alias_is_not_expanded(self):
-        annotations, counts = self.counts("dir_b/unresolved_alias.ml")
-        self.assertEqual(annotations, 1)
-        self.assertEqual(counts, {"Cap.env": 1, "caps_unresolved": 1})
+        fs = cap_stats.scan_file(FIXTURES / "dir_b/unresolved_alias.ml")
+        self.assertEqual(fs.annotations, 1)
+        self.assertEqual(dict(fs.cap_counts), {"Cap.env": 1, "caps_unresolved": 1})
         # unresolved "caps" is conservatively counted as 1 item + Cap.env
-        self.assertEqual(self.sizes("dir_b/unresolved_alias.ml"), [2])
+        self.assertEqual(fs.block_sizes, [2])
+        # the one annotation here is unresolved
+        self.assertEqual(fs.unresolved_annotations, 1)
 
     def test_decoys_are_not_counted(self):
+        # includes non-capability object types in the ":>" / "(" / "*"
+        # positions the broader anchor now covers (hashtable-style
+        # interfaces, GUI widget types, plain coercions) -- none of them
+        # contain a Cap.xxx/alias token, so none should be counted.
         annotations, counts = self.counts("dir_a/decoys.ml")
         self.assertEqual(annotations, 1)
         self.assertEqual(counts, {"Cap.env": 1})
@@ -80,7 +87,7 @@ class TestCollect(unittest.TestCase):
 
         self.assertEqual(set(per_dir), {"dir_a", "dir_b"})
 
-        self.assertEqual(per_dir["dir_a"].loc, 13 + 16 + 3 + 10 + 2)
+        self.assertEqual(per_dir["dir_a"].loc, 21 + 16 + 3 + 10 + 2)
         self.assertEqual(per_dir["dir_a"].annotations, 9)
         self.assertEqual(sum(per_dir["dir_a"].cap_counts.values()), 27)
 
@@ -98,6 +105,53 @@ class TestCollect(unittest.TestCase):
         # one block_sizes entry per annotation, summing to total cap uses
         self.assertEqual(len(total.block_sizes), total.annotations)
         self.assertEqual(sum(total.block_sizes), sum(total.cap_counts.values()))
+
+
+class TestCrossFileResolution(unittest.TestCase):
+    """Aliases resolved using tree-wide context from collect(), which a
+    standalone scan_file() call cannot see."""
+
+    def test_qualified_alias_and_coercion(self):
+        per_dir, total = cap_stats.collect(CROSSFILE_FIXTURES)
+
+        # "Shell.caps" (used in scheduler.ml) resolves against Shell.ml's
+        # own "type caps = < Cap.exec; Cap.fork; Cap.wait >"; a bare
+        # ":>" coercion "(caps :> < Cap.exec >)" is also picked up.
+        self.assertEqual(total.annotations, 9)
+        self.assertEqual(total.unresolved_annotations, 0)
+        self.assertEqual(dict(total.cap_counts), {
+            "Cap.exec": 5, "Cap.fork": 4, "Cap.wait": 4, "Cap.env": 1,
+            "Cap.stdout": 2, "Cap.chdir": 2, "Cap.draw": 2, "Cap.keyboard": 2,
+        })
+        self.assertNotIn("caps_unresolved", total.cap_counts)
+
+    def test_one_hop_reexport_chain(self):
+        # "type caps = Cmd_.caps" (a re-export, no "<" of its own) must
+        # resolve one hop to Cmd_'s own "type caps = < ... >" definition.
+        raw_defs = {
+            ("Main", "caps"): ("ref", "Cmd_", "caps"),
+            ("Cmd_", "caps"): ["Cap.stdout", "Cap.chdir"],
+        }
+        index = cap_stats.resolve_alias_index(raw_defs)
+        self.assertEqual(index[("Main", "caps")], ["Cap.stdout", "Cap.chdir"])
+
+    def test_unresolvable_ref_and_cycle_are_none_not_a_crash(self):
+        raw_defs = {
+            ("A", "caps"): ("ref", "B", "caps"),  # B.caps is never defined
+            ("C", "caps"): ("ref", "D", "caps"),
+            ("D", "caps"): ("ref", "C", "caps"),  # C <-> D cycle
+        }
+        index = cap_stats.resolve_alias_index(raw_defs)
+        self.assertIsNone(index[("A", "caps")])
+        self.assertIsNone(index[("C", "caps")])
+        self.assertIsNone(index[("D", "caps")])
+
+    def test_open_brings_alias_into_scope(self):
+        # frame.ml has "open Efuns" and uses the bare "frame_caps" alias
+        # defined in efuns.ml, not frame.ml itself.
+        per_dir, total = cap_stats.collect(CROSSFILE_FIXTURES)
+        self.assertEqual(total.cap_counts["Cap.draw"], 2)  # efuns.ml's own def + frame.ml's use
+        self.assertEqual(total.cap_counts["Cap.keyboard"], 2)
 
 
 if __name__ == "__main__":

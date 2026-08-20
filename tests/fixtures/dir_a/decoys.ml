@@ -11,3 +11,11 @@ let help_text = " usage: foo <initcmd> <Cap.bar> "
 let another_string = "< caps; .. > looks like an annotation but is a string"
 
 let ok_one (caps : < Cap.env; .. >) = ignore caps
+
+(* Non-capability object types in the same syntactic positions the
+   broader anchor (":>" / "(" / "*") now covers -- must still be
+   excluded since they contain no Cap.xxx/alias token. *)
+let hashish : (unit -> 'b) -> < add : 'a -> 'b -> unit; to_list : ('a * 'b) list > = assume_defined
+let widget : (< draw : unit -> unit; .. > -> unit) = assume_defined
+let pair : (float * < union : 'a -> 'o; .. >) = assume_defined
+let coerce (x : < add : int -> unit >) = (x :> < add : int -> unit >)
