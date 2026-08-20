@@ -1,0 +1,1 @@
+This file must be ignored by cap_stats.py: < Cap.should_not_count; .. >
