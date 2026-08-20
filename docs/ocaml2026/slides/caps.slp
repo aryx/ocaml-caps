@@ -110,7 +110,7 @@ val open_socket  : < Cap.network; .. > -> string -> unit
 {.outline}
 - Capability types, in detail [abstract types, object types, `Cap.main`]{.sub}
 - Capability rules [forbid calls to the dangerous functions of `Stdlib`, `Unix`, `Sys`]{.sub}
-- Experience report [osemgrep, the mmm browser, XiX, pros and cons]{.sub}
+- Experience report [semgrep, the mmm browser, efuns, XiX, pros and cons]{.sub}
 - Related work [eio, cap-std, Pony, Haskell effect systems]{.sub}
 
 {pause up}
@@ -365,11 +365,12 @@ codebase. Most code is ["pure"]{.em}.
 
 {pause}
 Usually just a [few hours]{.em} to migrate a project. And
-incremental!{.em}
+incremental{.em}!
 
 Nice side effect:
 migrating forces a **better understanding** of the
-codebase, and **documenting** things along the way.
+codebase, and **documenting** things along the way, and
+**finding "bugs"** (or questionable practices).
 <!-- which makes the rest of the migration even easier.-->
 
 {pause up}
@@ -385,11 +386,11 @@ codebase, and **documenting** things along the way.
 > - Incremental{.em}: a handful of annotations + a handful of Semgrep
 >   rules, not a rewrite. {pause}
 > - **Uncovers issues buried deep in the call stack** — hard to find
->   otherwise. E.g. a call to `uname` via `Unix.open_process_in`,
+>   otherwise. [E.g. a call to `uname` via `Unix.open_process_in`,
 >   added by a junior developer, missed in review, and a performance
->   bottleneck. {pause}
+>   bottleneck.]{.sub} {pause}
 > - A quick-and-dirty hack (calling a program, abusing `/tmp`, etc.) needs a new capability threaded through the
->   **whole call chain** — much harder to sneak past review. {pause}
+>   **whole call chain** [much harder to sneak past review.]{.sub} {pause}
 > - Finally a use case for objects in OCaml :) {pause}
 >
 > {style="flex:1"}
@@ -397,8 +398,10 @@ codebase, and **documenting** things along the way.
 >
 > - Still some [effort]{.em} {pause}
 > - `Cap.ml` alone doesn't stop anyone — needs Semgrep, and Semgrep
->   rules can be disabled or `nosemgrep`-ed. {pause}
+>   rules can be disabled or `nosemgrep`-ed.
+>   [Or use TCB approach.]{.sub} {pause}
 > - C stub can still bypass everything else, as well as external libraries
+>   [But could "fingerprint" external libs]{.sub}
 
 <!--  migrating an existing codebase, writing and maintaining the `CapXxx` wrapper modules by hand. -->
 
@@ -423,7 +426,7 @@ codebase, and **documenting** things along the way.
   runtime for OCaml 5 effects; `Cap.ml` borrows just the capability
   idea, independent of eio.
   [Irony: eio itself replaced objects with polymorphic variants in
-  2023 — users found them confusing]{.sub}.
+  2023 — users and Jane Street found them confusing]{.sub}.
 - **cap-std** (Rust) — capability-safe wrappers around the OS,
   removing ambient authority.
 - **Pony** — reference capabilities baked into the type system
