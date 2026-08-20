@@ -29,7 +29,6 @@ dimension: 16:9
 val foo : int -> float
 ```
 
-{pause}
 What can `foo` do?
 
 {pause}
@@ -49,7 +48,6 @@ The type says nothing. You cannot [reason]{.em} locally about a module.
 
 The `IO` [monad]{.em} forces you to mark [effectful]{.em} code.
 
-{pause}
 {.example title="API.hs"}
 ```haskell
 putStrLn   :: String -> IO ()
@@ -71,7 +69,6 @@ less radical than the imposed purity of Haskell.
 Inspired by [eio](https://roscidus.com/blog/blog/2023/04/26/lambda-capabilities/),
 generalized with plain OCaml **object types**.
 
-{pause}
 {.example title="MyCapModule.mli"}
 ```ocaml
 val bar :
@@ -79,19 +76,23 @@ val bar :
   int -> float
 ```
 
-{pause}
 `< x; y >` is OCaml's [object type]{.em} syntax — e.g.
 `type shape = < move : int -> int -> unit; area : unit -> float >`.
 
 {pause}
-- Add `..` — `< x; .. >` — for an *open* row: "at least field `x`,
-  maybe more." That's [row polymorphism]{.em}. {pause}
+Add `..` — `< x; .. >` — for an *open* row: "at least field `x`,
+  maybe more." That's [row polymorphism]{.em}.
+<!--  
 - Only works in argument position, not in a plain `type` alias like
   `shape` — exactly where capability signatures live.
+-->  
 
 {pause}
 Now the signature says everything `bar` might do — and nothing it
 can't.
+
+We can finally [reason]{.em} about a module — the promise of
+functional programming!
 
 {pause down}
 {.example title="src/caps/CapStdlib.mli"}
@@ -101,9 +102,6 @@ val delete_file  : < Cap.fs; .. >      -> string -> unit
 val open_socket  : < Cap.network; .. > -> string -> unit
 ```
 
-{pause down}
-We can finally [reason]{.em} about a module — the promise of
-functional programming!
 
 {pause up}
 # Outline
@@ -119,7 +117,7 @@ functional programming!
 
 {.definition}
 An **unforgeable token** that both **designates** a resource and
-**grants the authority** to use it — no reference => no access.
+**grants the authority** to use it —{pause} no reference => no access.
 <!--alt: A **communicable**, **unforgeable** token of authority -->
 
 
@@ -131,7 +129,6 @@ kernel hands it to you.
 {pause}
 OCaml too with **channels**: `in_channel` / `out_channel` (refined read/write capabilities).
 
-{pause}
 Capabilities aren't a new idea — Unix and OCaml already use them.
 This talk just pushes the [discipline]{.em} further.
 
@@ -139,8 +136,8 @@ This talk just pushes the [discipline]{.em} further.
 # Capabilities are abstract (combining) types
 
 Capabilities are deliberately [fine-grained]{.em} — one per syscall and resource;
-[object types]{.em} allows to [combine]{.em} them for free, no OCaml extension
-needed.
+[object types]{.em} allows to [combine]{.em} them for free, **no OCaml extension
+needed**.
 
 {style="display:flex; gap:20px; align-items:flex-start"}
 > {.example title="src/caps/Cap.mli" style="flex:1"}
@@ -190,6 +187,13 @@ let restart (caps : < Cap.fork; Cap.wait; .. >) () =
 {pause down}
 The beauty: the OCaml [typechecker]{.em} does all the capability
 checking for us, for free — it even [infers]{.em} capabilities!
+
+
+
+
+
+
+
 
 {pause up}
 # But two things are missing
@@ -248,20 +252,19 @@ val main : (all_caps -> 'a) -> 'a
 Every capability is secretly just `unit` at runtime — the `.mli`
 boundary is the only thing keeping them apart.
 
-{pause down}
 `Cap.main`:
 - Callable exactly once — checked dynamically.
 - Hands your entry point **every** capability.
 - The entry point then **downcasts** (`:>`) to give each callee only
   the subset it needs.
 
-{pause down}
 {.example title="Main.ml"}
 ```ocaml
 let () =
   Cap.main (fun (caps : Cap.all_caps) ->
     restart (caps :> < Cap.fork; Cap.wait; .. >) ())
 ```
+{pause down}
 
 
 {pause up}
@@ -293,6 +296,7 @@ No time to explain [Semgrep](https://semgrep.dev) in depth here — I
 actually presented it at this very workshop, back in 2021 :) (though
 things have changed since — `jsonnet` instead of YAML, different
 syntax).
+<!-- handle local module renaming (limited) so A.fork detected -->
 
 
 {pause up}
@@ -300,15 +304,20 @@ syntax).
 
 Rolled out on three real codebases:
 
-- **osemgrep** — The OCaml part of Semgrep itself
-- **mmm** — An old experimental Web browser written in OCaml
+- **semgrep** — the original motivations for caps: growing codebase doing
+  also networking, executing external progs, and more (junior) contributors
+- **mmm** — An old experimental Web browser written in OCaml (Francois Rouaix)
+- **efuns** — An old Emacs clone written in OCaml (Fabrice LeFessant)
 - **XiX** — Ports of several **Plan 9** systems programs in OCaml: a
-  build system, a shell, a windowing system, a toolchain
+  build system, a shell, a windowing system, a toolchain (diversity)
 
 {pause}
-Each time: a handful of capability annotations plus a handful of
-Semgrep rules was enough to enforce capabilities across the whole
-codebase.
+Each time: only a few hundreds capability annotations (for projects
+around 50k-100k LOC) enough to enforce capabilities across the whole
+codebase. Most code is *[pure]{.em}*.
+
+{pause} a handful of
+Semgrep rules was 
 
 {pause}
 Usually just a few [hours]{.em} to migrate a project. And it's
