@@ -405,39 +405,35 @@ codebase, and **documenting** things along the way.
 {pause up}
 # Capabilities and AI coding agents
 
-{pause}
 - `Cap.ml` designed *pre*-coding-agent era, for plain software-engineering /
-  architecture goals — to defend against junior or corner-cutting colleagues.
+  architecture goals (and to defend against junior or corner-cutting colleagues).
   Even **more useful** now, in the AI agent era! {pause}
 - A reviewer can trust the *interface* (`.mli`): if it needs no dangerous
-  capability, the type system guarantees the implementation (`.ml`) can't use
-  one either. {pause}
-- Stronger types become a **sandbox** around generated code, not just
-  documentation.
+  capability, the type system (and Semgrep) guarantees the implementation (`.ml`) can't use one either. {pause}
+- Capability types become a **sandbox** around generated code, not just documentation. {pause}
 - Agents pick up the capability discipline instantly, no coaching
-  needed. {pause}
+  needed.
 
 
 
 {pause up}
 # Related work
 
-{pause}
 - **eio** (OCaml) — direct inspiration, but eio is a full IO/fiber
   runtime for OCaml 5 effects; `Cap.ml` borrows just the capability
-  idea, independent of eio. {pause}
-- Irony: eio itself replaced objects with polymorphic variants in
-  2023 — users found them confusing. Its capabilities are also tied
-  to one *specific resource instance* (true delegation), vs.
-  `Cap.ml`'s coarser abstract permission flags. {pause}
+  idea, independent of eio.
+  [Irony: eio itself replaced objects with polymorphic variants in
+  2023 — users found them confusing]{.sub}.
 - **cap-std** (Rust) — capability-safe wrappers around the OS,
-  removing ambient authority. {pause}
+  removing ambient authority.
 - **Pony** — reference capabilities baked into the type system
-  itself. {pause}
+  itself.
 - **Haskell** — mtl-style typeclasses (`MonadFileSystem`, ...) or
   effect libraries (`polysemy`, `fused-effects`, `effectful`) can get
   similar fine-grained tracking, at the cost of extra machinery on
   top of plain `IO`.
+
+<!-- Its capabilities are also tied to one *specific resource instance* (true delegation), vs.`Cap.ml`'s coarser abstract permission flags. -->
 
 {pause up}
 # Thank you
