@@ -185,26 +185,22 @@ let restart caps () =
   | _ -> ignore (CapUnix.wait caps ())
 ```
 
+The beauty: the OCaml [typechecker]{.em} checks the capability
+for us (even [infers]{.em} capabilities!)
+
 {.example title="MyModule.mli"}
 ```ocaml
 val restart: < Cap.fork; Cap.exit; ..> -> unit -> unit
 ```
 
-The beauty: the OCaml [typechecker]{.em} checks the capability
-for us (even [infers]{.em} capabilities!)
-
 {pause down}
 <pre class="term example" down-at-unpause pause title="terminal"><code class="language-shell">$ dune exec demos/foo.exe
 Error: The implementation does not match the interface:
-          val restart :
-            &lt; exit : Cap.Process.exit; fork : Cap.Process.fork;
-              wait : Cap.Process.wait; .. &gt; -&gt; unit -&gt; unit
+          val restart : &lt; exit : Cap.Process.exit; fork : Cap.Process.fork;
+                          wait : Cap.Process.wait; .. &gt; -&gt; unit -&gt; unit
         is not included in
-          val restart :
-            &lt; exit : Cap.Process.exit; fork : Cap.Process.fork; .. &gt; -&gt;
-            unit -&gt; unit
+          val restart : &lt; exit : Cap.Process.exit; fork : Cap.Process.fork; .. &gt; -&gt; unit -&gt; unit
         <span class="danger">The second object type has no method wait</span>
-...
 </code></pre>
 
 <!--
@@ -359,7 +355,7 @@ Rolled out on four real codebases (between 20k-100k each):
 <!-- diverse programs! not just PA :) system programs too -->  
 
 {pause}
-Each time: between [50-500 capability annotations]{.em} and dozen
+Each time: between [50-500 capability annotations]{.em} (median 1 capability per annotation) and dozen
 Semgrep rules enough to enforce capabilities across the whole
 codebase. Most code is ["pure"]{.em}.
 
@@ -442,6 +438,7 @@ codebase, and **documenting** things along the way, and
 # Thank you
 
 - `Cap.ml`: <https://github.com/aryx/ocaml-caps>
+- `opam install caps` (soon)
 - Semgrep: <https://semgrep.dev>
 - eio and the capability idea: <https://roscidus.com/blog/blog/2023/04/26/lambda-capabilities/>
 
