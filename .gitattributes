@@ -1,0 +1,4 @@
+# https://github.com/github/linguist/blob/master/docs/overrides.md
+# Don't consider script files in language stats for the repository on Github
+scripts/** linguist-documentation
+tests/** linguist-documentation
