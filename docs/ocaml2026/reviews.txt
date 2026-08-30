@@ -1,0 +1,92 @@
+ocaml26 Paper #6 Reviews and Comments
+===========================================================================
+Paper #6 A Capability Type System for OCaml
+
+
+Review #6A
+===========================================================================
+
+Overall merit
+-------------
+3. Weak accept
+
+Reviewer expertise
+------------------
+3. Knowledgeable
+
+Summary
+-------
+This talk proposal is about a "capabilities library" for OCaml that tracks the effects of functions (fork, network, filesystem, etc).
+
+Comments & Questions
+--------------------
+The proposal is appealing in the sense that it seems rather lightweight: additional guarantees can be obtained without having to modify the OCaml compiler. It seems reasonable to have a presentation about it at the OCaml workshop.
+
+Many questions remain to be unanswered:
+
+- It is not clear how to program using these capabilities. Do programmers have to pass them around explicitly? An example of a program that uses some system calls would be nice.
+- It is unclear how the library works with higher-order functions, such as mapping over a list.
+- No statistics are provided about the number of changes that are needed to port existing code.
+- It is unclear how the work is inspired by the eio library. Which ideas are exactly taken from there, and what is changed?
+- The proposal relies on a tool called SemGrep (which the author is the main contributor of). SemGrep both has a GPL "Community Edition" and a commercial version. Does this work with the community version? Is there any special feature of SemGrep that is needed, or would this also work with other Linter-like software?
+- The proposal claims that "AI coding agents have no issue learning the capability system", but no evidence about that is provided.
+
+Nits:
+
+- Consider using actual OCaml syntax. I don't get the `< 1a>≡1b ▷` syntax.
+- Hyperlinks are broken. My PDF viewer gives errors such as: "Error when getting information for file “/home/myself/../ https:/roscidus.com/blog/blog/2023/04/26/lambda-capabilities/ ”: No such file or directory"
+- Section 1: Avoid extensive use of the word "really"
+
+
+
+Review #6B
+===========================================================================
+
+Overall merit
+-------------
+2. Weak reject
+
+Reviewer expertise
+------------------
+2. Some familiarity
+
+Summary
+-------
+The author presents a small capability library which allows to keep track of which system calls is performed by a function. He argues that, for instance, this allows to gain confidence that some code cannot make any dangerous operation just by looking at the types, without having to review carefully the whole code.
+
+
+
+Review #6C
+===========================================================================
+
+Overall merit
+-------------
+3. Weak accept
+
+Reviewer expertise
+------------------
+3. Knowledgeable
+
+Summary
+-------
+The proposal describes a way to enrich types with information about whether a function does system calls (for a selected set of functionalities).
+
+Comments & Questions
+--------------------
+I think the proposed talk would be of interest to the OCaml community.
+
+My only reservation is with respect to the scientific aspects of the talk.
+
+I understand a capability as a "unique resource": not only you cannot forge it, but you cannot duplicate it either. If I'm not mistaken, your system allows duplication. For example, it seems like you could introduce the function
+
+  `let my_fork = CapUnix.fork caps`
+
+and use it freely in `main`'s callback. The function `my_fork` captures `caps` but nothing in OCaml would flag that as a mistake. Therefore, you can use `my_fork` instead of `CapUnix.fork` to avoid parameterizing a function `f` with `caps` and thus completely avoid the capability annotation in the signature of `f`.
+
+In this sense, the narrative of strengthening OCaml's guarantees falls apart.
+
+## Suggestions
+
+1. Explain the syntax of modules with angle brackets and `\equiv`.
+2. Explain why `main` "sanity checks dynamically [that] it has not been called before". (I assume that this enforces a capability is only created by `main` once.)
+3. Explain that, from a technical perspective, the system doesn't add guarantees.
