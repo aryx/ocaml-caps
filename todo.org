@@ -1,0 +1,14 @@
+
+* Docs
+
+** slides
+
+*** FAQ: just use VM/sandbox/... in slides
+ but I do that not so much for security, more for soft-eng!
+ insane can't trust module interfaces
+
+* Users
+
+** All
+
+*** RELAX update different repos to latest caps submodule
