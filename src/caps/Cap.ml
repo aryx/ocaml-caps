@@ -12,6 +12,9 @@
  *  - https://roscidus.com/blog/blog/2023/04/26/lambda-capabilities/
  *
  * related work:
+ *  - TODO: https://www.redox-os.org/news/nlnet-cap-nsmgr-cwd/
+ *  - TODO: recent OCaml lib for openBSD:
+ *    https://codeberg.org/removewingman/restricted
  *  - https://en.wikipedia.org/wiki/E_(programming_language) which
  *    itself led to Emily which was about adding capabilities in OCaml
  *    https://www.hpl.hp.com/techreports/2006/HPL-2006-116.html
@@ -38,12 +41,37 @@
  *  - use an effect system, but not ready yet for OCaml
  *  - use semgrep rules, but this would be more of a blacklist approach
  *    whereas here it is more a whitelist approach
- *    update: we actually combine Cap, TCB with now semgrep rules, see
- *    the forbid_xxx.jsonnet rules in this directory.
+ *    update: we actually combine Cap with semgrep rules now, see
+ *    the use-caps and do-not-use-xxx rules in semgrep.jsonnet.
+ *
+ * history:
+ *  - use plain records to encode caps statically
+ *  - use object types of OCaml as extensible records to encode caps statically
+ *    (as done originally in EIO but they later switched to (ugly) open variants
+ *     because of Jane Street's hate of objects)
+ *    Using plain records was simpler, however, objects,
+ *    which can be seen as extensible records, are nice because you can have
+ *    signatures like <network: Cap.Network.t; fs: Cap.FS.t> without having
+ *    to name this type and without having to introduce yet another record
+ *    for the combination of those two capabilities.
+ *    Objects are a bit to records what polymorphic variants are to variants,
+ *    that is [ taint | search ] allow to merge variants without introducing
+ *    an intermediate name. Polymorphic variants are extensible Sum types,
+ *    objects are extensible Product types!
+ *  - use intermediate types like shortcut 'type open_in = <open_in: FS.open_in>'
+ *    that can be combined (and even concatenated) easily with
+ *    '<Cap.open_in; Cap.stdout; Cap.forkew>'
+ *  - use '..' as in '< Cap.open_in; Cap.stdout; ..>'
+ *  - add dynamic checks too so one can override also dynamically caps!
+ *    Thx to the new 'type open_in = <open_in: string -> FS.open_in>'.
+ *    Now we need to access the caps in CapSys.ml for example to give the
+ *    opportunity to raise an exn in some overriden caps.
  *
  * LATER:
- *  - exn (ability to thrown exn)
- *  - comparison? forbid polymorphic equal, forbid compare, force deriving
+ *  - could move in xix/lib_system/ at some point
+ *  - exn caps (ability to throw or not certain exn) that you can see
+ *    in the type?
+ *  - comparison caps? forbid polymorphic equal, forbid compare, force deriving
  *  - refs? (and globals)
  *
  * Assumed (ambient) capabilities:
@@ -55,8 +83,8 @@
 (* Core type *)
 (**************************************************************************)
 
-(* Note that it's important this type is not exported in Cap.mli!
- * Each capability must be seen as an independent abstract type
+(* Note that it is important for this type to NOT be exported in Cap.mli!
+ * Each capability must be seen as an independent abstract type.
  *)
 type cap = unit
 
@@ -64,7 +92,7 @@ type cap = unit
 (* Network *)
 (**************************************************************************)
 
-(* TODO: sub capabilities: host, url, ports, get vs post *)
+(* TODO: sub caps? host, url, ports, get vs post? or restrict dynamically ?*)
 module Network = struct
   type t = cap
 end
@@ -73,50 +101,25 @@ end
 (* FS *)
 (**************************************************************************)
 
-module FS = struct
+module FS_ = struct
   type readdir = cap
+  type tmp = cap
   type open_in = cap
   type open_out = cap
-
-  type open_r = cap
-  type open_w = cap
-
-  (* TODO: read vs write, specific dir (in_chan or out_chan of opened dir *)
-  type root_r = cap
-  type root_w = cap
-  type root_all_r = cap
-  type root_all_w = cap
-  type cwd_r = cap
-  type cwd_w = cap
-  type home_r = cap
-  type home_w = cap
-  type dotfiles_r = cap
-  type dotfiles_w = cap
-  type tmp = cap
-
-  (* files or directories mentioned in argv *)
-  type files_argv_r = cap
-  type files_argv_w = cap
 end
 
 (**************************************************************************)
 (* Files *)
 (**************************************************************************)
-
-module File = struct
-  (* TODO: embed also the filename in it? useful for
-   * error reporting.
-   * TODO? inout_channel?
-   *)
-  type in_channel = Stdlib.in_channel
-  type out_channel = Stdlib.out_channel
-end
+(* The OCaml in_channel and out_channel are already good capabilities we
+ * can reuse.
+ *)
 
 (**************************************************************************)
 (* Exec *)
 (**************************************************************************)
 
-(* TODO: sub capabilities exec a particular program 'git_cmd Exec.t' *)
+(* TODO: sub caps exec a particular program 'git_cmd Exec.t' or dynamic? *)
 module Exec = struct
   type t = cap
 end
@@ -128,41 +131,54 @@ end
 module Process = struct
   (* basic stuff *)
   type argv = cap
-
-  (* less: could split in env_r, env_w *)
   type env = cap
 
-  (* advanced stuff
-   * TODO: split signal? use subtypes to make alarm a subtype of signal?
-   *)
-  type signal = cap
+  (* advanced stuff *)
   type exit = cap
-  type pid = cap
-  type kill = cap
   type chdir = cap
+
+  (* TODO: split signal? use subtypes to make alarm a subtype of signal?*)
+  type signal = cap
 
   (* multi processes *)
   type fork = cap
   type wait = cap
-  type thread = cap
-  type domain = cap
+  type kill = cap
+  (* pipe? not sure it requires a cap; it's a local thing *)
 
   (* old: was alarm, but better rename to be consistent with memory_limit
-   * See process_limits/
+   * See libs/process_limits/
    *)
   type time_limit = cap
   type memory_limit = cap
+
+  (* plan9 caps *)
+  type mount = cap
+  type bind = cap
 end
 
 (**************************************************************************)
 (* Console *)
 (**************************************************************************)
 
+(* TODO: ugly: but I had to rename Console and FS to add an underscore
+ * because ocamldep in ocaml-light does not handle nested module well
+ * and if I use Console below I then get a cycle when compiling.
+ * This seems to be an issue only if the file Console.ml or FS.ml
+ * exist. Otherwise like for Process.ml it does not generate the
+ * dependency, even if it's a nested module like the other.
+ * WEIRD
+ *)
 (* alt: could be part of Process *)
-module Console = struct
+module Console_ = struct
   type stdin = cap
   type stdout = cap
   type stderr = cap
+
+  (* plan9 caps *)
+  type draw = cap
+  type keyboard = cap
+  type mouse = cap
 end
 
 (**************************************************************************)
@@ -170,14 +186,77 @@ end
 (**************************************************************************)
 
 module Misc = struct
-  (* supposedely important for side-channel attack *)
-  type time = cap
-
   (* useful to be sure the program is deterministic and is not calling
    * any random generator functions.
    *)
   type random = cap
+
+  (* supposedely important for side-channel attack *)
+  (* type time = cap *)
 end
+
+(**************************************************************************)
+(* Shortcuts *)
+(**************************************************************************)
+
+(* fs *)
+type readdir = < readdir : string (* path *) -> FS_.readdir >
+type tmp = < tmp : FS_.tmp >
+type open_in = < open_in : string (* path *) -> FS_.open_in >
+type open_out = < open_out : string (* path *) -> FS_.open_out >
+type fs = < readdir ; tmp; open_in; open_out >
+
+(* console *)
+type stdin = < stdin : Console_.stdin >
+type stdout = < stdout : Console_.stdout >
+type stderr = < stderr : Console_.stderr >
+type draw = < draw : Console_.draw >
+type keyboard = < keyboard : Console_.keyboard >
+type mouse = < mouse : Console_.mouse >
+type console = < stdin ; stdout ; stderr; draw; keyboard; mouse >
+
+
+(* process *)
+type argv = < argv : Process.argv >
+type env = < env : Process.env >
+type signal = < signal : Process.signal >
+type time_limit = < time_limit : Process.time_limit >
+type memory_limit = < memory_limit : Process.memory_limit >
+type exit = < exit : Process.exit >
+type chdir = < chdir : Process.chdir >
+type fork = < fork : Process.fork >
+type wait = < wait : Process.wait >
+type kill = < kill : Process.kill >
+type mount = < mount : Process.mount >
+type bind = < bind: Process.bind >
+type process_multi = < fork; wait; kill >
+type process_single = < signal ; time_limit ; memory_limit ; exit ; chdir; mount; bind >
+type process = < argv ; env; process_single ; process_multi >
+
+(* exec *)
+type exec = < exec : string (* cmd *) -> Exec.t >
+(* shortcut *)
+type forkew = < fork; exec; wait >
+
+(* networl *)
+type network = < network : string (* IP *) -> Network.t >
+
+(* misc *)
+type random = < random : Misc.random >
+type misc = < random >
+
+(* alt: called "Stdenv.Base.env" in EIO *)
+type all_caps =
+  < console
+  ; process
+  ; fs (* a mix of fs and process_multi as it requires both *)
+  ; exec
+  ; network
+  ; misc >
+
+type no_caps = < >
+
+let no_caps : no_caps = object end
 
 (**************************************************************************)
 (* The powerbox *)
@@ -188,144 +267,67 @@ end
  *  - "How Emily Tamed the Caml"
  *     https://www.hpl.hp.com/techreports/2006/HPL-2006-116.html
  *
- * I was using plain records before, which was simple. However, objects,
- * which can be seen as extensible records, are nice because you can have
- * signatures like <network: Cap.Network.t; fs: Cap.FS.t; ..> without having
- * to name this type and without having to introduce yet another record
- * for the combination of those 2 capabilities.
+ * Note that you can further restrict dynamically capabilities by
+ * overriding the passed object. For example, here is some code from
+ * oed to further restrict exec/open:
  *
- * Objects are a bit to records what polymorphic variants are to variants,
- * that is [ taint | search ] allow to merge variants without introducing
- * an intermediate name. Polymorphic variants are extensible Sum types,
- * objects are extensible Product types!
+ *    type caps = < Cap.exec; Cap.open_in; Cap.open_out; Cap.fork; Cap.stdin>
+ *    let restrict_caps rflag (x : < caps; ..>) =
+ *      object
+ *        method exec _cmd = 
+ *          if rflag then failwith "!restricted mode on!"
+ *          else x#exec cmd
+ *        method open_in file = 
+ *          if rflag && not (Fpath.is_seg file)
+ *          then failwith (spf "!restricted mode on, can't read %s!" file)
+ *          else x#open_in file
+ *        method open_out file = 
+ *          if rflag && not (Fpath.is_seg file) &&
+ *             (* need open_out to delete tmp file in Commands.quit() *)
+ *             not (file = !!Env.tfname)
+ *          then failwith (spf "!restricted mode on, can't write %s!" file)
+ *          else x#open_out file
+ *        method fork = x#fork
+ *        ...
+ *      end
  *)
-
-(* fs *)
-type readdir = < readdir : FS.readdir >
-type open_in = < open_in : FS.open_in >
-type open_out = < open_out : FS.open_out >
-type root = < root_r : FS.root_r ; root_w : FS.root_w >
-type root_all = < root_all_r : FS.root_all_r ; root_all_w : FS.root_all_w >
-type cwd = < cwd_r : FS.cwd_r ; cwd_w : FS.cwd_w >
-type home = < home_r : FS.home_r ; home_w : FS.home_w >
-type dotfiles = < dotfiles_r : FS.dotfiles_r ; dotfiles_w : FS.dotfiles_w >
-type tmp = < tmp : FS.tmp >
-
-type files_argv =
-  < files_argv_r : FS.files_argv_r ; files_argv_w : FS.files_argv_w >
-
-type fs =
-  < readdir
-  ; open_in; open_out
-  ; open_r : FS.open_r
-  ; open_w : FS.open_w
-  ; root
-  ; root_all
-  ; cwd
-  ; home
-  ; dotfiles
-  ; tmp
-  ; files_argv >
-
-(* console *)
-type stdin = < stdin : Console.stdin >
-type stdout = < stdout : Console.stdout >
-type stderr = < stderr : Console.stderr >
-type console = < stdin ; stdout ; stderr >
-
-(* process *)
-type argv = < argv : Process.argv >
-type env = < env : Process.env >
-type signal = < signal : Process.signal >
-type time_limit = < time_limit : Process.time_limit >
-type memory_limit = < memory_limit : Process.memory_limit >
-type exit = < exit : Process.exit >
-type pid = < pid : Process.pid >
-type kill = < kill : Process.kill >
-type chdir = < chdir : Process.chdir >
-type fork = < fork : Process.fork >
-type wait = < wait : Process.wait >
-type domain = < domain : Process.domain >
-type thread = < thread : Process.thread >
-type process_multi = < pid ; kill ; fork ; wait; domain ; thread >
-type process_single = < signal ; time_limit ; memory_limit ; exit ; chdir >
-type process = < argv ; env ; console ; process_single ; process_multi >
-
-(* exec *)
-type exec = < exec : Exec.t >
-
-(* networl *)
-type network = < network : Network.t >
-
-(* misc *)
-type time = < time : Misc.time >
-type random = < random : Misc.random >
-type misc = < time ; random >
-
-(* alt: called "Stdenv.Base.env" in EIO *)
-type all_caps =
-  < process
-  ; fs (* a mix of fs and process_multi as it requires both *)
-  ; exec
-  ; network
-  ; misc >
-
-type no_caps = < >
-
-let no_caps : no_caps = object end
-
-(* shortcuts *)
-type forkew = < fork; exec; wait >
 
 let powerbox : all_caps =
   object
     (* fs *)
-    method readdir = ()
-    method open_in = ()
-    method open_out = ()
-    method open_r = ()
-    method open_w = ()
-    method root_r = ()
-    method root_w = ()
-    method root_all_r = ()
-    method root_all_w = ()
-    method cwd_r = ()
-    method cwd_w = ()
-    method home_r = ()
-    method home_w = ()
-    method dotfiles_r = ()
-    method dotfiles_w = ()
-    method files_argv_r = ()
-    method files_argv_w = ()
+    method readdir _path = ()
     method tmp = ()
+    method open_in _path = ()
+    method open_out _path = ()
 
     (* console *)
     method stdin = ()
     method stdout = ()
     method stderr = ()
+    method draw = ()
+    method keyboard = ()
+    method mouse = ()
 
     (* process *)
     method argv = ()
     method env = ()
-    method pid = ()
-    method kill = ()
     method chdir = ()
     method signal = ()
     method time_limit = ()
     method memory_limit = ()
     method fork = ()
     method wait = ()
+    method kill = ()
     method exit = ()
-    method domain = ()
-    method thread = ()
+    method mount = ()
+    method bind = ()
 
     (* misc *)
-    method time = ()
     method random = ()
 
     (* dangerous stuff *)
-    method exec = ()
-    method network = ()
+    method exec _cmd = ()
+    method network _ip = ()
   end
 
 (**************************************************************************)
@@ -333,43 +335,44 @@ let powerbox : all_caps =
 (**************************************************************************)
 
 (* !!DO NOT USE!! *)
-let network_caps_UNSAFE () =
-  object
-    method network = ()
-  end
-
-(* !!DO NOT USE!! *)
 let tmp_caps_UNSAFE () =
   object
     method tmp = ()
   end
 
-(* !!DO NOT USE!! *)
-let stdout_caps_UNSAFE () =
-  object
-    method stdout = ()
-  end
 
-(* !!DO NOT USE!! *)
-let caps_for_js_UNSAFE () =
-  object
-    method fork = ()
-    method time_limit = ()
-    method memory_limit = ()
-    method readdir = ()
-  end
-
-(* !!DO NOT USE!! *)
-let exec_and_tmp_caps_UNSAFE () =
-  object
-    method exec = ()
-    method tmp = ()
-  end
-
-let readdir_UNSAFE () =
-  object
-    method readdir = ()
-  end
+(*
+-let network_caps_UNSAFE () =
+-  object
+-    method network = ()
+-  end
+-(* !!DO NOT USE!! *)
+-let stdout_caps_UNSAFE () =
+-  object
+-    method stdout = ()
+-  end
+-
+-(* !!DO NOT USE!! *)
+-let caps_for_js_UNSAFE () =
+-  object
+-    method fork = ()
+-    method time_limit = ()
+-    method memory_limit = ()
+-    method readdir = ()
+-  end
+-
+-(* !!DO NOT USE!! *)
+-let exec_and_tmp_caps_UNSAFE () =
+-  object
+-    method exec = ()
+-    method tmp = ()
+-  end
+-
+-let readdir_UNSAFE () =
+-  object
+-    method readdir = ()
+- end
+*)
 
 (**************************************************************************)
 (* Entry point *)
@@ -377,7 +380,7 @@ let readdir_UNSAFE () =
 
 let already_called_main = ref false
 
-(* TODO: in addition to the dynamic check below, we could also
+(* In addition to the dynamic check below, we could also
  * write a semgrep rule to forbid any call to Cap.main() except
  * in Main.ml (via a nosemgrep or paths: exclude:)
  *)

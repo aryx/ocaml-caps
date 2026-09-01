@@ -1,97 +1,120 @@
 (* Capabilities implemented as simple abstract types and explicit
  * (object) arguments/parameters ("Lambda the ultimate security tool").
  *
+ * Here is an example of use:
+ *
+ *   let foo (caps : < Cap.stdout; ..>) str =
+ *      CapConsole.print caps str
+ *
+ *   let bar (caps : < Cap.stdout; Cap.stderr; ..) str = 
+ *      CapConsole.eprint caps str;
+ *      foo str
+ *   
+ *   let _main =
+ *     Cap.main (fun all_caps -> bar all_caps)
+ *
+ * Thx to capabilities, you can see in the signature of functions the
+ * set of capabilities that are needed, a bit like an effect system.
+ *
+ * Note that you must also find a way to forbid your code to call
+ * the dangerous standard lib functions that are not capability-aware
+ * (e.g., Stdlib.printf, Unix.stdout, etc.). One way is to use a tool
+ * like Semgrep (see xix/semgrep.jsonnet file for an example).
+ *
+ * For more information, see xix/utilities/text/ed/ for a simple example of
+ * use of capabilities in a real program.
+ *
+ *
  * Note that most of the types below are on purpose abstract and there is
  * no way to build/forge them except by calling the restricted (statically
  * and dynamically) Cap.main() below. This function is passing all capabilities
  * to the entry point of your program; this entry point can then restrict
- * the set of capabilities to pass to other functions by using the :> cast
- * operator.
+ * statically the set of capabilities to pass to other functions by using
+ * the :> cast operator.
+ *
+ * Note that you can further restrict dynamically capabilities by
+ * overriding the passed object. For example, here is some code from
+ * oed to further restrict exec/open:
+ *
+ *    type caps = < Cap.exec; Cap.open_in; Cap.open_out; Cap.fork; Cap.stdin>
+ *    let restrict_caps rflag (x : < caps; ..>) =
+ *      object
+ *        method exec _cmd = 
+ *          if rflag then failwith "!restricted mode on!"
+ *          else x#exec cmd
+ *        method open_in file = 
+ *          if rflag && not (Fpath.is_seg file)
+ *          then failwith (spf "!restricted mode on, can't read %s!" file)
+ *          else x#open_in file
+ *        method open_out file = 
+ *          if rflag && not (Fpath.is_seg file) &&
+ *             (* need open_out to delete tmp file in Commands.quit() *)
+ *             not (file = !!Env.tfname)
+ *          then failwith (spf "!restricted mode on, can't write %s!" file)
+ *          else x#open_out file
+ *        method fork = x#fork
+ *        ...
+ *      end
  *)
 
 (**************************************************************************)
 (* Standard capabilities *)
 (**************************************************************************)
 
-module Console : sig
+module Console_ : sig
   type stdin
   type stdout
   type stderr
   (* logs are an "ambient" authority though *)
+
+  (* plan9 caps *)
+  type draw
+  type keyboard
+  type mouse
 end
 
 module Process : sig
-  (* basic stuff *)
   type argv
   type env
 
-  (* advanced stuff *)
-  type signal
   type exit
-  type pid
-  type kill
   type chdir
+  type signal
 
-  (* limits *)
   type time_limit
   type memory_limit
 
-  (* See also the separate Exec.t *)
+  (* exec has its separate module below *)
   type fork
   type wait
-  type thread
-  type domain
+  type kill
+
+  (* plan9 fileservers and namespaces *)
+  type mount
+  type bind
 end
 
-(* read/write on root|cwd|tmp|~|~.xxx| (and files/dirs mentioned in argv) *)
-module FS : sig
+module FS_ : sig
   type readdir
+  type tmp
+  (* we could refine in open_argv, open_pwd, open_root but you can also implement
+   * those restrictions dynamically like in restrict_caps() above *)
   type open_in
   type open_out
-
-  (* a.k.a open_in and open_out in OCaml world *)
-  type open_r
-  type open_w
-
-  (* TODO: finer-grained readdir and open_r, open_w *)
-  type root_r
-  type root_w
-
-  (* this gives also access to /proc, /sys, etc. *)
-  type root_all_r
-  type root_all_w
-  type cwd_r
-  type cwd_w
-  type home_r
-  type home_w
-  type dotfiles_r
-  type dotfiles_w
-
-  (* not worth differentiate between tmp_r/tmp_w, anyway /tmp has 't' bit *)
-  type tmp
-
-  (* files or directories mentioned in argv *)
-  type files_argv_r
-  type files_argv_w
 end
 
 module Exec : sig
   (* note that you can make your own exec capability (e.g., git_exec)
    * a subtype of this one by defining your own function
-   * that takes Exec.t and gives the subcapability
+   * that takes Exec.t and gives the subcapability.
+   * You can also restrict the cap dynamically like in restrict_caps() above.
    *)
   type t
 end
 
-(* See also commons/Chan.ml *)
-module File : sig
-  type in_channel = Stdlib.in_channel
-  type out_channel = Stdlib.out_channel
-end
-
 module Network : sig
-  (* TODO? make specific host subcapability? like semgrep_url_capa ?
-   * imitate Rust cap-std project with a pool of allowed IPs?
+  (* You can also restrict the cap dynamically like in restrict_caps() above
+   * for example to whitelist a set of IPs.
    *)
   type t
 end
@@ -103,45 +126,21 @@ module Misc : sig
   type random
 
   (* profiling functions are an "ambient" authority though *)
-  type time
+  (* TODO: time *)
 end
 
 (**************************************************************************)
-(* Powerbox *)
+(* Shortcuts *)
 (**************************************************************************)
 
-(* fs *)
-type readdir = < readdir : FS.readdir >
-type open_in = < open_in : FS.open_in >
-type open_out = < open_out : FS.open_out >
-type root = < root_r : FS.root_r ; root_w : FS.root_w >
-type root_all = < root_all_r : FS.root_all_r ; root_all_w : FS.root_all_w >
-type cwd = < cwd_r : FS.cwd_r ; cwd_w : FS.cwd_w >
-type home = < home_r : FS.home_r ; home_w : FS.home_w >
-type dotfiles = < dotfiles_r : FS.dotfiles_r ; dotfiles_w : FS.dotfiles_w >
-type tmp = < tmp : FS.tmp >
-
-type files_argv =
-  < files_argv_r : FS.files_argv_r ; files_argv_w : FS.files_argv_w >
-
-type fs =
-  < readdir
-  ; open_in; open_out
-  ; open_r : FS.open_r
-  ; open_w : FS.open_w
-  ; root
-  ; root_all
-  ; cwd
-  ; home
-  ; dotfiles
-  ; tmp
-  ; files_argv >
-
 (* console *)
-type stdin = < stdin : Console.stdin >
-type stdout = < stdout : Console.stdout >
-type stderr = < stderr : Console.stderr >
-type console = < stdin ; stdout ; stderr >
+type stdin = < stdin : Console_.stdin >
+type stdout = < stdout : Console_.stdout >
+type stderr = < stderr : Console_.stderr >
+type draw = < draw : Console_.draw >
+type keyboard = < keyboard : Console_.keyboard >
+type mouse = < mouse : Console_.mouse >
+type console = < stdin ; stdout ; stderr; draw; keyboard; mouse >
 
 (* process *)
 type argv = < argv : Process.argv >
@@ -150,31 +149,47 @@ type signal = < signal : Process.signal >
 type time_limit = < time_limit : Process.time_limit >
 type memory_limit = < memory_limit : Process.memory_limit >
 type exit = < exit : Process.exit >
-type pid = < pid : Process.pid >
-type kill = < kill : Process.kill >
 type chdir = < chdir : Process.chdir >
 type fork = < fork : Process.fork >
 type wait = < wait : Process.wait >
-type domain = < domain : Process.domain >
-type thread = < thread : Process.thread >
-type process_multi = < pid ; kill ; fork ; wait; domain ; thread >
-type process_single = < signal ; time_limit ; memory_limit ; exit ; chdir >
-type process = < argv ; env ; console ; process_single ; process_multi >
+type kill = < kill : Process.kill >
+type mount = < mount : Process.mount >
+type bind = < bind: Process.bind >
+type process_multi = < fork; wait; kill >
+type process_single = < signal ; time_limit ; memory_limit ; exit ; chdir; mount; bind >
+type process = < argv ; env; process_single ; process_multi >
+
+(* fs *)
+(* note that open_in/open_out take a file path (as a string) as parameter so
+ * one can do extra dynamic check before granting the cap by overwriting
+ * the open_in/open_out method from the passed all_caps like in
+ * restrict_caps() above.
+ *)
+type open_in = < open_in : string (* path *) -> FS_.open_in >
+type open_out = < open_out : string (* path *) -> FS_.open_out >
+type readdir = < readdir : string (* path *) -> FS_.readdir >
+type tmp = < tmp : FS_.tmp >
+type fs = < readdir ; tmp; open_in; open_out >
 
 (* exec *)
-type exec = < exec : Exec.t >
+type exec = < exec : string (* cmd *) -> Exec.t >
+(* shortcut *)
+type forkew = < fork; exec; wait >
 
 (* network *)
-type network = < network : Network.t >
+type network = < network : string (* IP or name *) -> Network.t >
 
 (* misc *)
-type time = < time : Misc.time >
 type random = < random : Misc.random >
-type misc = < time ; random >
+type misc = < random >
 
-(* alt: called "Stdenv.Base.env" in EIO *)
+(**************************************************************************)
+(* Powerbox *)
+(**************************************************************************)
+
 type all_caps =
-  < process
+  < console
+  ; process
   ; fs
   ; exec (* exec is a mix of fs and process_multi as it requires both *)
   ; network
@@ -195,19 +210,11 @@ type no_caps = < >
  *)
 val no_caps : no_caps
 
-(* shortcuts *)
-type forkew = < fork; exec; wait >
-
 (**************************************************************************)
 (* Temporary unsafe caps to help migration *)
 (**************************************************************************)
 (* !!DO NOT USE!! *)
-val network_caps_UNSAFE : unit -> < network >
 val tmp_caps_UNSAFE : unit -> < tmp >
-val stdout_caps_UNSAFE : unit -> < stdout >
-val caps_for_js_UNSAFE : unit -> < fork ; time_limit ; memory_limit ; readdir >
-val exec_and_tmp_caps_UNSAFE : unit -> < exec ; tmp >
-val readdir_UNSAFE : unit -> < readdir >
 
 (**************************************************************************)
 (* Entry point *)
