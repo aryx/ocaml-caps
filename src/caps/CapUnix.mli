@@ -1,8 +1,8 @@
 (* Capability-aware wrappers of the dangerous functions in Unix.ml *)
 
 (* See also commons/CapExec.ml *)
-val execv : < Cap.exec; .. > -> string -> string array -> 'a
-val execve : < Cap.exec; .. > -> string -> string array -> string array -> 'a
+val execv : < Cap.exec; .. > -> string -> string array -> unit
+val execve : < Cap.exec; .. > -> string -> string array -> string array -> unit
 (*val execvp : < Cap.exec; .. > -> string -> string array -> 'a*)
 
 val environment : < Cap.env; ..> -> unit -> string array
