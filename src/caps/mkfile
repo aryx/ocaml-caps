@@ -1,0 +1,8 @@
+TOP=../../..
+INCLUDES=-I .
+
+#coupling: dune '(modules ...)' stanza
+SRC=Cap.ml CapStdlib.ml CapSys.ml CapUnix.ml
+
+<$TOP/mkconfig
+<$TOP/mkfiles/mklib

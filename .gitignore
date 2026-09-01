@@ -1,2 +1,5 @@
 /_build
 /docs/ocaml2026/slides/caps.html
+
+*.cm*
+.depend

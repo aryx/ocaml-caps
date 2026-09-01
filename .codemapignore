@@ -1,0 +1,5 @@
+# skipped because contain AI code used to compute statistics about
+# the use of caps in codebase, for my OCaml2026 workshop presentation.
+
+scripts/
+tests/
