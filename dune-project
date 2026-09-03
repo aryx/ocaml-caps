@@ -17,6 +17,7 @@
   (synopsis "Capability types and rules for OCaml")
   (description "Capability types (Cap.ml) enforcing restricted I/O access across a codebase.")
   (depends
+    ;; Sys.extra_prefix (used in src/tcb/TCB.ml) was only added in 4.14.
     (ocaml (>= 4.14))
   )
 )
