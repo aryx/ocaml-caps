@@ -31,6 +31,10 @@ build-docker-ocaml5:
 # in dune-project (and add an entry to CHANGES.md) before running this.
 opam-release:
 	dune-release lint
-	dune-release
+	dune-release tag
+	dune-release distrib
+	dune-release publish
+	dune-release opam pkg
+	dune-release opam submit
 
 release: opam-release
