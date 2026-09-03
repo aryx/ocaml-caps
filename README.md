@@ -11,11 +11,12 @@ When combined with the use of the Semgrep tool and
 
 ## Documentation
 
-See https://aryx.github.io/ocaml-caps/caps.html for more information.
+See https://aryx.github.io/ocaml-caps/ for more information.
 My OCaml workshop 2026 presentation is also available here:
 https://www.youtube.com/watch?v=4t_2wLz9EOo
 and the slides here:
-https://aryx.github.io/ocaml-caps/
+https://aryx.github.io/ocaml-caps/caps.html 
+
 
 You might find also useful the related https://github.com/aryx/ocaml-commons
 project that provides a few additional modules using capabilities.
