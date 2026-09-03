@@ -1,0 +1,25 @@
+# Build ocaml-caps via docker.
+# See also Dockerfile at the root of the project.
+
+name: docker
+
+on:
+  pull_request_target: {}
+  workflow_dispatch: null
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        ocaml:
+          - 4.14.2
+          - 5.2.1
+    steps:
+      - uses: actions/checkout@v4
+      # optional if don't need multi-arch build
+      - uses: docker/setup-buildx-action@v3
+      # alt: make build-docker
+      - run: docker build --tag "caps" --build-arg OCAML_VERSION=${{matrix.ocaml}} .
