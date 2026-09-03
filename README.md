@@ -21,6 +21,14 @@ https://aryx.github.io/ocaml-caps/caps.html
 You might find also useful the related https://github.com/aryx/ocaml-commons
 project that provides a few additional modules using capabilities.
 
+Here are a few projects currently using `Cap.ml`:
+- https://github.com/aryx/osemgrep
+- https://github.com/aryx/efuns
+- https://github.com/aryx/mmm
+- https://github.com/aryx/xix
+which you can use as examples to follow. Start from their `Main.ml`
+file and follow down how capabilities are passed and required.
+
 ## History
 
 The library was developed in 2024 while I was working at Semgrep
