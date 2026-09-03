@@ -13,3 +13,9 @@ demo:
 
 setup:
 	opam install --confirm-level=unsafe-yes --deps-only .
+
+# This will fail if caps.opam isn't up-to-date (in git),
+# and dune isn't installed yet. You can always install dune with
+# 'opam install dune' to get started.
+caps.opam: dune-project
+	dune build $@

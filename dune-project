@@ -4,7 +4,7 @@
 (map_workspace_root false)
 
 (generate_opam_files)
-(version 1.0.0)
+(version 0.1.0)
 
 (source (github aryx/ocaml-caps))
 (maintainers "Yoann Padioleau <yoann.padioleau@gmail.com>")
