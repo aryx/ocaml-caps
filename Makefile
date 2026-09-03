@@ -53,6 +53,6 @@ opam-release:
 	dune-release tag
 	dune-release distrib
 	dune-release publish
-	opam-publish aryx/ocaml-caps
+	opam-publish
 
 release: opam-release
