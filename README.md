@@ -26,14 +26,16 @@ Here are a few projects currently using `Cap.ml`:
 - https://github.com/aryx/efuns
 - https://github.com/aryx/mmm
 - https://github.com/aryx/xix
-which you can use as examples to follow. Start from their `Main.ml`
-file and follow down how capabilities are passed and required.
+
+You can use those projects as examples to follow. Start from their `Main.ml`
+file and follow down how capabilities are passed down and required
+in other files.
 
 ## History
 
 The library was developed in 2024 while I was working at Semgrep
 but got extracted in its own repository in August 2026
-(mostly as support for my OCaml workshop 2026 presentation).
+(mostly to support my OCaml workshop 2026 presentation).
 
 ## AI disclaimer
 
