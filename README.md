@@ -14,6 +14,8 @@ When combined with the use of the Semgrep tool and
 See https://aryx.github.io/ocaml-caps/caps.html for more information
 as well as https://aryx.github.io/ocaml-caps/
 
+OCaml workshop 2026 presentation here: https://www.youtube.com/watch?v=4t_2wLz9EOo
+
 You might find also useful the related https://github.com/aryx/ocaml-commons
 project that provides a few additional modules using capabilities.
 
