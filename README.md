@@ -11,10 +11,11 @@ When combined with the use of the Semgrep tool and
 
 ## Documentation
 
-See https://aryx.github.io/ocaml-caps/caps.html for more information
-as well as https://aryx.github.io/ocaml-caps/
-
-OCaml workshop 2026 presentation here: https://www.youtube.com/watch?v=4t_2wLz9EOo
+See https://aryx.github.io/ocaml-caps/caps.html for more information.
+My OCaml workshop 2026 presentation is also available here:
+https://www.youtube.com/watch?v=4t_2wLz9EOo
+and the slides here:
+https://aryx.github.io/ocaml-caps/
 
 You might find also useful the related https://github.com/aryx/ocaml-commons
 project that provides a few additional modules using capabilities.
@@ -22,7 +23,7 @@ project that provides a few additional modules using capabilities.
 ## History
 
 The library was developed in 2024 while I was working at Semgrep
-but got extracted in its own repository in September 2026
+but got extracted in its own repository in August 2026
 (mostly as support for my OCaml workshop 2026 presentation).
 
 ## AI disclaimer
