@@ -11,6 +11,7 @@ homepage: "https://github.com/aryx/ocaml-caps"
 bug-reports: "https://github.com/aryx/ocaml-caps/issues"
 depends: [
   "dune" {>= "3.7"}
+  "ocaml" {>= "4.14"}
   "odoc" {with-doc}
 ]
 build: [

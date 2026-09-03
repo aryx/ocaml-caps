@@ -16,4 +16,7 @@
 (package (name caps)
   (synopsis "Capability types and rules for OCaml")
   (description "Capability types (Cap.ml) enforcing restricted I/O access across a codebase.")
+  (depends
+    (ocaml (>= 4.14))
+  )
 )
