@@ -25,16 +25,28 @@ build-docker:
 build-docker-ocaml5:
 	docker build -t "caps" --build-arg OCAML_VERSION=5.2.1 .
 
-# Release a new version to opam, via dune-release (opam install dune-release).
-# This tags the current commit, pushes it, creates a GitHub release with the
-# generated tarball, and opens a PR against opam-repository. Bump the version
-# in dune-project (and add an entry to CHANGES.md) before running this.
+# Release a new version to opam. Bump the version in dune-project (and add
+# an entry to CHANGES.md) before running this.
+#
+# We use dune-release (opam install dune-release) for tag/distrib/publish:
+# it tags the commit, pushes the tag, builds the source tarball, and creates
+# a GitHub release with that tarball attached.
+#
+# For the last step, submitting to opam-repository, we use opam-publish
+# (opam install opam-publish) instead of `dune-release opam submit`.
+# dune-release's opam submit (as of dune-release.2.2.0) does NOT fork
+# ocaml/opam-repository for you: it requires a fork you already created on
+# GitHub, cloned locally, and configured in ~/.config/dune/release.yml
+# (this is what "expecting a writable opam-repository fork" means if you
+# haven't set that up). opam-publish instead forks ocaml/opam-repository
+# under your account itself, builds the opam package from the GitHub
+# release we just published, shows you the diff to confirm, and opens the
+# PR -- no pre-existing fork or local clone needed.
 opam-release:
 	dune-release lint
 	dune-release tag
 	dune-release distrib
 	dune-release publish
-	dune-release opam pkg
-	dune-release opam submit
+	opam-publish aryx/ocaml-caps
 
 release: opam-release
