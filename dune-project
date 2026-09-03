@@ -9,7 +9,7 @@
 (source (github aryx/ocaml-caps))
 (maintainers "Yoann Padioleau <yoann.padioleau@gmail.com>")
 (authors "Yoann Padioleau <yoann.padioleau@gmail.com>")
-(license "LGPL-2.1-only")
+(license "LGPL-2.1-only WITH OCaml-LGPL-linking-exception")
 
 ;; Packages
 

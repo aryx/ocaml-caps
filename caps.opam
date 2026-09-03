@@ -6,7 +6,7 @@ description:
   "Capability types (Cap.ml) enforcing restricted I/O access across a codebase."
 maintainer: ["Yoann Padioleau <yoann.padioleau@gmail.com>"]
 authors: ["Yoann Padioleau <yoann.padioleau@gmail.com>"]
-license: "LGPL-2.1-only"
+license: "LGPL-2.1-only WITH OCaml-LGPL-linking-exception"
 homepage: "https://github.com/aryx/ocaml-caps"
 bug-reports: "https://github.com/aryx/ocaml-caps/issues"
 depends: [

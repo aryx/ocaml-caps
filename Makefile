@@ -24,3 +24,13 @@ build-docker:
 	docker build -t "caps" .
 build-docker-ocaml5:
 	docker build -t "caps" --build-arg OCAML_VERSION=5.2.1 .
+
+# Release a new version to opam, via dune-release (opam install dune-release).
+# This tags the current commit, pushes it, creates a GitHub release with the
+# generated tarball, and opens a PR against opam-repository. Bump the version
+# in dune-project (and add an entry to CHANGES.md) before running this.
+opam-release:
+	dune-release lint
+	dune-release
+
+release: opam-release
