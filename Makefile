@@ -42,6 +42,12 @@ build-docker-ocaml5:
 # under your account itself, builds the opam package from the GitHub
 # release we just published, shows you the diff to confirm, and opens the
 # PR -- no pre-existing fork or local clone needed.
+# Note: these steps are not idempotent, so don't just blindly rerun
+# `make release` after a partial failure (e.g. `dune-release tag` refuses to
+# retag once HEAD has moved on, and `dune-release distrib` after that would
+# bake a dirty "0.1.0-N-gHASH" version instead of "0.1.0"). If it fails
+# partway, look at which command errored and run the remaining ones below
+# by hand instead.
 opam-release:
 	dune-release lint
 	dune-release tag
