@@ -1,0 +1,30 @@
+// caps/demos/: the OCaml Workshop 2026 talk's demo (dune exec demos/foo.exe)
+local skeletons = import '../../skeletons.libsonnet';
+{
+  generated: { by: 'claude-opus-5-5', on: '2026-09-30' },
+  summary: "The talk's demo: restart() needs fork, wait, exit, and the type checker says so.",
+  files: {
+    'foo.ml': {
+      summary: 'Fork a child that pretends to exec a new version, the parent waiting: three capabilities.',
+      digest: 'd7ea225fad5b',
+      capitals: [{ at: 'def:restart', say: 'its type is its authority: fork, wait, exit' }],
+      important: [
+        { at: 'code:"Cap.main (fun"', say: 'the only door: every capability, once', weight: 3 },
+        { at: 'code:"CapUnix.fork caps"', say: 'the capability passed, as any argument', weight: 3 },
+        { at: 'code:"print_endline"', say: 'stdout used without Cap.stdout: ambient here', weight: 1 },
+      ],
+    },
+    'foo.mli': {
+      summary: "restart's signature: remove Cap.wait and the compiler refuses foo.ml.",
+      digest: '5f34494d185c',
+    },
+  },
+  skeletons: [
+    skeletons.chain('The demo: Cap.main to restart to fork', [
+      ['foo.ml:code:"Cap.main (fun"', 'the program: every capability, once', ''],
+      ['foo.ml:def:restart', 'needs exactly fork, wait and exit', 'all_caps, downcast'],
+      ['../src/caps/CapUnix.ml:def:fork', 'the capability consulted, then Unix.fork', 'caps'],
+      ['../src/caps/CapUnix.ml:def:wait', 'the parent waits for the child', 'the pid'],
+    ]),
+  ],
+}

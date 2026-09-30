@@ -1,0 +1,139 @@
+// caps/src/caps/: the capabilities, what every xix program is written
+// with (Cap.mli is the project's biggest hub). A git submodule, also
+// published alone as ocaml-caps (caps/README.md).
+local skeletons = import '../../../skeletons.libsonnet';
+{
+  generated: { by: 'claude-opus-5-5', on: '2026-09-30' },
+  summary: 'The capabilities: what a function may touch (files, processes, console) written in its type.',
+  files: {
+    'Cap.mli': {
+      summary: 'Each capability an abstract type, a method of an object; Cap.main the only door to them.',
+      digest: 'adb9f3e7f6a0',
+      capitals: [
+        { at: 'type:all_caps', say: 'every capability: what Cap.main hands to Main' },
+        { at: 'def:main', say: 'the only way in; once, from Main.ml' },
+        { at: 'code:"type open_in = <"', say: 'a shortcut: < Cap.open_in; .. > in a signature' },
+      ],
+      important: [
+        { at: 'comment:"Here is an example of use"', say: 'the whole idea in ten lines', weight: 3 },
+        { at: 'comment:"restrict dynamically capabilities by"', say: "oed's restricted mode: a method overridden", weight: 3 },
+        { at: 'module:Console_', say: "the underscore: ocaml-light's ocamldep, see Cap.ml", weight: 1 },
+        { at: 'code:"type process = <"', say: 'groups of capabilities, composed as objects', weight: 1 },
+        { at: 'code:"type forkew = <"', say: 'fork, exec, wait: what running a command needs', weight: 1 },
+        { at: 'type:no_caps', say: 'pure: just the CPU and the RAM', weight: 1 },
+        { at: 'def:tmp_caps_UNSAFE', say: 'a hole for migration: DO NOT USE', weight: 1 },
+      ],
+    },
+    'Cap.ml': {
+      summary: 'Every capability is unit underneath; the powerbox, an object granting them all, given once.',
+      digest: '5e4700cf6f23',
+      important: [
+        { at: 'type:cap', say: 'unit, never exported: each type stays abstract', weight: 3 },
+        { at: 'def:powerbox', say: 'all the methods, all (): the authority itself', weight: 3 },
+        { at: 'def:main', say: 'a dynamic check: Cap.main cannot be called twice', weight: 3 },
+        { at: 'comment:"ocamldep in ocaml-light does not handle nested module"', say: 'why Console_ and FS_ have an underscore', weight: 1 },
+        { at: 'comment:"a mix of fs and process_multi"', say: "stale: this note is exec's (Cap.mli's), not fs's", weight: 1 },
+        { at: 'comment:"Assumed (ambient) capabilities"', say: 'what is not a capability: RAM, CPU, logs', weight: 1 },
+      ],
+      links: [{ from: 'def:main', to: 'def:powerbox' }],
+    },
+    'CapSys.mli': {
+      summary: "Sys's dangerous functions behind a capability: argv, getenv, chdir, command.",
+      digest: 'df10580b87fe',
+      important: [
+        { at: 'def:argv', say: 'the command line itself is a capability', weight: 3 },
+        { at: 'def:command', say: 'a shell command: fork, exec and wait', weight: 1 },
+      ],
+    },
+    'CapSys.ml': {
+      summary: 'Each wrapper touches its capability (caps#env), so an overridden method can refuse.',
+      digest: 'dba959808367',
+      important: [
+        { at: 'def:command', say: 'caps#exec cmd: the command checked by name', weight: 3 },
+        { at: 'comment:"TODO: add to ocaml-light"', say: "getenv_opt: missing in ocaml-light's Sys", weight: 1 },
+      ],
+    },
+    'CapUnix.mli': {
+      summary: "Unix's process calls behind capabilities: fork, exec, wait, kill, chdir, unlink.",
+      digest: 'c3902123f2bb',
+      important: [
+        { at: 'def:fork', say: 'the most used: builder/Shell.ml, Proc.ml', weight: 3 },
+        { at: 'def:unlink', say: 'the path twice: one checked, one removed', weight: 3 },
+        { at: 'comment:"You should use CapExec.ml instead"', say: 'stale: no CapExec.ml in xix', weight: 1 },
+      ],
+    },
+    'CapUnix.ml': {
+      summary: 'The wrappers: the capability consulted, then the real Unix function returned unapplied.',
+      digest: '8145c9b6342f',
+      important: [
+        { at: 'def:unlink', say: "bug: checks file, returns Unix.unlink for any other path", weight: 3 },
+        { at: 'def:execv', say: 'caps#exec cmd before exec: the program named', weight: 1 },
+      ],
+    },
+    'CapStdlib.mli': {
+      summary: "Stdlib's exit and open_in behind capabilities; deprecated for Exit.exit, FS.with_open_in.",
+      digest: 'e21a1e87c02f',
+    },
+    'CapStdlib.ml': {
+      summary: 'Deprecated wrappers of exit and open_in, still used by macroprocessor, shell, draw.',
+      digest: 'f5f2f6f183b5',
+    },
+    'CapRandom.mli': {
+      summary: 'Random.int and get_state behind the random capability: a program without it is deterministic.',
+      digest: '35e490eff918',
+    },
+    'CapRandom.ml': {
+      summary: "Wrappers that ignore their capability (no caps#random): unused, and not in the mkfile's SRC.",
+      digest: '1fe8f68f9ee5',
+    },
+  },
+  skeletons: [
+    skeletons.parts('The capabilities: the types, the door, the wrappers', [
+      ['Cap.mli', 'the capabilities as abstract types, methods of objects'],
+      ['Cap.ml', 'the powerbox: every method, granted by Cap.main once'],
+      ['CapSys.ml', "Sys's argv, getenv, chdir, command behind capabilities"],
+      ['CapUnix.ml', "Unix's fork, exec, wait, kill behind capabilities"],
+      ['CapStdlib.ml', 'exit and open_in (deprecated for lib_core/commons)'],
+      ['../../../lib_core/commons/', 'Console, FS, Exit, Proc: the capability-aware library'],
+    ], [
+      ['Cap.ml', 'Cap.mli', 'implements; the types kept abstract'],
+      ['CapSys.ml', 'Cap.mli', 'demands < Cap.argv; .. >'],
+      ['CapUnix.ml', 'Cap.mli', 'demands < Cap.fork; .. >'],
+      ['CapStdlib.ml', 'Cap.mli', 'demands < Cap.exit; .. >'],
+      ['../../../lib_core/commons/', 'CapUnix.ml', 'Proc forks and waits through it'],
+      ['../../../lib_core/commons/', 'Cap.mli', 'every effect demands a capability'],
+    ]),
+    {
+      name: 'Cap.ml: abstract units, an object of them all, one door',
+      bones: [
+        { at: 'Cap.ml:type:cap', role: 'unit: a capability costs nothing at run time' },
+        { at: 'Cap.ml:code:"type open_in = <"', role: 'the shortcuts: one method each, composable' },
+        { at: 'Cap.ml:type:all_caps', role: 'every capability, one object type' },
+        { at: 'Cap.ml:def:powerbox', role: 'the object granting them all' },
+        { at: 'Cap.ml:def:already_called_main', role: 'the dynamic check: once only' },
+        { at: 'Cap.ml:def:main', role: 'the door: the powerbox to the program' },
+      ],
+      joints: [
+        { from: 'Cap.ml:type:cap', to: 'Cap.ml:code:"type open_in = <"', say: 'a method returns an abstract unit' },
+        { from: 'Cap.ml:code:"type open_in = <"', to: 'Cap.ml:type:all_caps', say: 'composed' },
+        { from: 'Cap.ml:type:all_caps', to: 'Cap.ml:def:powerbox', say: 'its type' },
+        { from: 'Cap.ml:def:powerbox', to: 'Cap.ml:def:main', say: 'handed to the entry point' },
+        { from: 'Cap.ml:def:already_called_main', to: 'Cap.ml:def:main', say: 'guards it' },
+      ],
+    },
+  ],
+  tours: [
+    {
+      name: 'How a capability reaches a system call',
+      stops: [
+        { at: 'Cap.mli:comment:"Here is an example of use"', say: 'The idea: a function says in its type what it may touch, like an effect system.' },
+        { at: 'Cap.mli:type:all_caps', say: 'All the capabilities, one object type: console, process, fs, exec, network, misc.' },
+        { at: 'Cap.ml:type:cap', say: 'Underneath, each is unit: nothing to pay, nothing to forge outside this file.' },
+        { at: 'Cap.ml:def:main', say: 'The only door: Main.ml calls Cap.main, which hands over the powerbox, once.' },
+        { at: 'CapSys.ml:def:argv', say: 'A wrapper: it touches caps#argv, then gives the real Sys.argv.' },
+        { at: 'CapUnix.ml:def:fork', say: 'Processes the same way; the semgrep rules forbid calling Unix.fork directly.' },
+        { at: 'Cap.mli:comment:"restrict dynamically capabilities by"', say: 'A method overridden restricts at run time: oed -r refuses exec and writes.' },
+      ],
+    },
+  ],
+}

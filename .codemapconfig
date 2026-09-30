@@ -1,0 +1,24 @@
+// caps/: ocaml-caps, a git submodule (github.com/aryx/ocaml-caps),
+// the capability library xix, efuns and osemgrep are written with
+{
+  generated: { by: 'claude-opus-5-5', on: '2026-09-30' },
+  summary: 'ocaml-caps: capabilities as OCaml object types, and the semgrep rules forbidding the rest.',
+  dirs: {
+    rules: { summary: 'Semgrep rules (jsonnet) forbidding Stdlib and Unix calls that bypass a capability.' },
+    docs: { summary: 'The web site, the OCaml Workshop 2026 paper (cap.nw) and its slides.' },
+  },
+  skeletons: [
+    {
+      name: 'ocaml-caps: the types, the rules that make them hold',
+      bones: [
+        { at: 'src/caps/Cap.mli', role: 'the capabilities, and Cap.main, the only door' },
+        { at: 'src/tcb/', role: "a Stdlib with the dangerous parts masked" },
+        { at: 'demos/', role: 'the talk\'s demo: restart, a fork, an exit' },
+      ],
+      joints: [
+        { from: 'demos/', to: 'src/caps/Cap.mli', say: 'written with' },
+        { from: 'src/tcb/', to: 'src/caps/Cap.mli', say: 'leaves only the CapXxx way' },
+      ],
+    },
+  ],
+}

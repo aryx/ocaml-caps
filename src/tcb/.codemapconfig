@@ -1,0 +1,54 @@
+// caps/src/tcb/: the Trusted Computing Base, a Stdlib with its
+// dangerous parts masked (ocaml -open TCB). A dune library only
+// (caps.tcb); no xix program opens it.
+local skeletons = import '../../../skeletons.libsonnet';
+{
+  generated: { by: 'claude-opus-5-5', on: '2026-09-30' },
+  summary: 'A Stdlib to -open with its dangerous parts masked as unit: only CapXxx reaches the world.',
+  files: {
+    'TCB.ml': {
+      summary: "Stdlib's names shadowed by (): stdout, open_in, exit, Sys, Unix; the originals kept as UStdlib, USys.",
+      digest: 'e9633f58ae77',
+      capitals: [{ at: 'module:UStdlib', say: 'U for unsafe: the escape hatch, qualified and greppable' }],
+      important: [
+        { at: 'comment:"the only way"', say: 'why unit: -open cannot hide Stdlib, only shadow it', weight: 3 },
+        { at: 'def:stdout', say: 'stdout is (): printing needs Cap.stdout now', weight: 3 },
+        { at: 'def:open_in', say: 'files forbidden: FS.with_open_in instead', weight: 3 },
+        { at: 'module:Sys', say: 'restricted: signals and constants, no argv', weight: 1 },
+        { at: 'module:Unix', say: 'restricted: types kept, calls removed', weight: 1 },
+        { at: 'comment:"Currently the TCB for semgrep"', say: "semgrep's origin: the TCB is far bigger", weight: 1 },
+      ],
+    },
+    'No_TCB.ml': {
+      summary: 'The U-aliases without the masking: TCB.ml compiled away, for a faster build.',
+      digest: '201f8096c83a',
+    },
+  },
+  skeletons: [
+    skeletons.parts('The TCB: masked, or not', [
+      ['TCB.ml', 'the Stdlib masked: what the capabilities cannot enforce alone'],
+      ['No_TCB.ml', 'the same U-aliases, nothing masked'],
+      ['../caps/Cap.mli', 'the capabilities the masked functions are replaced by'],
+    ], [
+      ['TCB.ml', '../caps/Cap.mli', 'sends the reader to CapXxx'],
+      ['No_TCB.ml', 'TCB.ml', 'stands in for it'],
+    ]),
+    {
+      name: 'TCB.ml: shadow, alias as U, restrict',
+      bones: [
+        { at: 'TCB.ml:module:UStdlib', role: 'the unsafe original, kept under a U name' },
+        { at: 'TCB.ml:module:Stdlib', role: 'Stdlib emptied: no qualified escape' },
+        { at: 'TCB.ml:def:stdout', role: 'the console forbidden: unit' },
+        { at: 'TCB.ml:def:open_in', role: 'the filesystem forbidden: unit' },
+        { at: 'TCB.ml:module:USys', role: 'Sys kept as USys' },
+        { at: 'TCB.ml:module:Sys', role: 'Sys restricted to the harmless' },
+      ],
+      joints: [
+        { from: 'TCB.ml:module:UStdlib', to: 'TCB.ml:module:Stdlib', say: 'the original saved, then emptied' },
+        { from: 'TCB.ml:module:Stdlib', to: 'TCB.ml:def:stdout', say: 'the opened names shadowed' },
+        { from: 'TCB.ml:def:stdout', to: 'TCB.ml:def:open_in', say: 'console, then files' },
+        { from: 'TCB.ml:module:USys', to: 'TCB.ml:module:Sys', say: 'the same for each module' },
+      ],
+    },
+  ],
+}

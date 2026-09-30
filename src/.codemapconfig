@@ -1,0 +1,5 @@
+// caps/src/: the two libraries of ocaml-caps
+{
+  generated: { by: 'claude-opus-5-5', on: '2026-09-30' },
+  summary: 'The capabilities library (caps), and the Trusted Computing Base that masks Stdlib (caps.tcb).',
+}
