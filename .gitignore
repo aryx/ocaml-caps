@@ -3,3 +3,6 @@
 
 *.cm*
 .depend
+
+__pycache__/
+*.install
