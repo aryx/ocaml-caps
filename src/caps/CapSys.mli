@@ -8,3 +8,7 @@ val getenv: < Cap.env; .. > -> string -> string
 
 (* DO NOT USE, use Cmd instead *)
 val command: < Cap.fork; Cap.exec; Cap.wait; .. > -> string -> int
+
+(* the processor time used: profiling, but a clock all the same *)
+val time : < Cap.clock; .. > -> unit -> float
+val getcwd : < Cap.env; .. > -> unit -> string

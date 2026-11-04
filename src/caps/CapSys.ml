@@ -26,3 +26,14 @@ let command (caps : < Cap.fork; Cap.exec; Cap.wait; .. >) cmd =
   let _ = caps#wait in
   (* nosemgrep: use-caps *)
   Sys.command cmd
+
+(* the processor time used: profiling, but a clock all the same *)
+let time (caps : < Cap.clock; ..>) =
+  let _ = caps#clock in
+  (* nosemgrep: use-caps *)
+  Sys.time
+
+let getcwd (caps : < Cap.env; ..>) =
+  let _ = caps#env in
+  (* nosemgrep: use-caps *)
+  Sys.getcwd

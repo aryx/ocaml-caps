@@ -88,6 +88,7 @@ module Process : sig
   type fork
   type wait
   type kill
+  type pipe
 
   (* plan9 fileservers and namespaces *)
   type mount
@@ -124,9 +125,9 @@ end
  *)
 module Misc : sig
   type random
-
-  (* profiling functions are an "ambient" authority though *)
-  (* TODO: time *)
+  (* the time, read or waited for; profiling functions are an "ambient"
+   * authority though *)
+  type clock
 end
 
 (**************************************************************************)
@@ -153,9 +154,10 @@ type chdir = < chdir : Process.chdir >
 type fork = < fork : Process.fork >
 type wait = < wait : Process.wait >
 type kill = < kill : Process.kill >
+type pipe = < pipe : Process.pipe >
 type mount = < mount : Process.mount >
 type bind = < bind: Process.bind >
-type process_multi = < fork; wait; kill >
+type process_multi = < fork; wait; kill; pipe >
 type process_single = < signal ; time_limit ; memory_limit ; exit ; chdir; mount; bind >
 type process = < argv ; env; process_single ; process_multi >
 
@@ -181,7 +183,8 @@ type network = < network : string (* IP or name *) -> Network.t >
 
 (* misc *)
 type random = < random : Misc.random >
-type misc = < random >
+type clock = < clock : Misc.clock >
+type misc = < random; clock >
 
 (**************************************************************************)
 (* Powerbox *)

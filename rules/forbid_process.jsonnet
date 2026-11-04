@@ -5,10 +5,18 @@ local unix_funcs = [
   'fork',
   'alarm',
   'setitimer',
+  // a pipe: Cap.pipe; the pid, the directory, the host: Cap.env
+  'pipe',
+  'socketpair',
+  'getpid',
+  'getppid',
+  'getcwd',
+  'gethostname',
   //TODO: alarm, signal, kill, waitpid, getenv, Bos.OS.Env
 ];
 
 local sys_funcs = [
+  'getcwd',
   //TODO: set_signal? but then need different capability depending
   // on the int argument of set_signal
 ];

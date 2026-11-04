@@ -144,7 +144,10 @@ module Process = struct
   type fork = cap
   type wait = cap
   type kill = cap
-  (* pipe? not sure it requires a cap; it's a local thing *)
+  (* a pipe, socketpair: a local thing, but a channel to a child made;
+   * as the clock, every system call asks for something (ix's
+   * plan_caps_syscalls.md) *)
+  type pipe = cap
 
   (* old: was alarm, but better rename to be consistent with memory_limit
    * See libs/process_limits/
@@ -191,8 +194,10 @@ module Misc = struct
    *)
   type random = cap
 
-  (* supposedely important for side-channel attack *)
-  (* type time = cap *)
+  (* the time, read or waited for (gettimeofday, time, sleepf): with
+   * random, what makes two runs differ, and important for side-channel
+   * attacks *)
+  type clock = cap
 end
 
 (**************************************************************************)
@@ -227,9 +232,10 @@ type chdir = < chdir : Process.chdir >
 type fork = < fork : Process.fork >
 type wait = < wait : Process.wait >
 type kill = < kill : Process.kill >
+type pipe = < pipe : Process.pipe >
 type mount = < mount : Process.mount >
 type bind = < bind: Process.bind >
-type process_multi = < fork; wait; kill >
+type process_multi = < fork; wait; kill; pipe >
 type process_single = < signal ; time_limit ; memory_limit ; exit ; chdir; mount; bind >
 type process = < argv ; env; process_single ; process_multi >
 
@@ -243,7 +249,8 @@ type network = < network : string (* IP *) -> Network.t >
 
 (* misc *)
 type random = < random : Misc.random >
-type misc = < random >
+type clock = < clock : Misc.clock >
+type misc = < random; clock >
 
 (* alt: called "Stdenv.Base.env" in EIO *)
 type all_caps =
@@ -318,12 +325,14 @@ let powerbox : all_caps =
     method fork = ()
     method wait = ()
     method kill = ()
+    method pipe = ()
     method exit = ()
     method mount = ()
     method bind = ()
 
     (* misc *)
     method random = ()
+    method clock = ()
 
     (* dangerous stuff *)
     method exec _cmd = ()

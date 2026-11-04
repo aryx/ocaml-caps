@@ -29,3 +29,22 @@ val setitimer :
   Unix.interval_timer_status ->
   Unix.interval_timer_status
 *)
+
+(* the clock: the time, read or waited for *)
+val gettimeofday : < Cap.clock; .. > -> unit -> float
+val time : < Cap.clock; .. > -> unit -> float
+val sleepf : < Cap.clock; .. > -> float -> unit
+val sleep : < Cap.clock; .. > -> int -> unit
+
+(* pipes *)
+val pipe :
+  < Cap.pipe; .. > -> ?cloexec:bool -> unit -> Unix.file_descr * Unix.file_descr
+val socketpair :
+  < Cap.pipe; .. > -> ?cloexec:bool -> Unix.socket_domain -> Unix.socket_type ->
+  int -> Unix.file_descr * Unix.file_descr
+
+(* what the process is told about where it runs, as its environment *)
+val getpid : < Cap.env; .. > -> unit -> int
+val getppid : < Cap.env; .. > -> unit -> int
+val getcwd : < Cap.env; .. > -> unit -> string
+val gethostname : < Cap.env; .. > -> unit -> string

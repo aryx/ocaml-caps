@@ -45,3 +45,49 @@ let unlink (caps : < Cap.open_out; ..>) file =
 let alarm _caps = Unix.alarm
 let setitimer _caps = Unix.setitimer
 *)
+
+(* the clock: the time, read or waited for *)
+let gettimeofday (caps : < Cap.clock; ..>) =
+  let _ = caps#clock in
+  (* nosemgrep: use-caps *)
+  Unix.gettimeofday
+let time (caps : < Cap.clock; ..>) =
+  let _ = caps#clock in
+  (* nosemgrep: use-caps *)
+  Unix.time
+let sleepf (caps : < Cap.clock; ..>) =
+  let _ = caps#clock in
+  (* nosemgrep: use-caps *)
+  Unix.sleepf
+let sleep (caps : < Cap.clock; ..>) =
+  let _ = caps#clock in
+  (* nosemgrep: use-caps *)
+  Unix.sleep
+
+(* pipes *)
+let pipe (caps : < Cap.pipe; ..>) =
+  let _ = caps#pipe in
+  (* nosemgrep: use-caps *)
+  Unix.pipe
+let socketpair (caps : < Cap.pipe; ..>) =
+  let _ = caps#pipe in
+  (* nosemgrep: use-caps *)
+  Unix.socketpair
+
+(* what the process is told about where it runs, as its environment *)
+let getpid (caps : < Cap.env; ..>) =
+  let _ = caps#env in
+  (* nosemgrep: use-caps *)
+  Unix.getpid
+let getppid (caps : < Cap.env; ..>) =
+  let _ = caps#env in
+  (* nosemgrep: use-caps *)
+  Unix.getppid
+let getcwd (caps : < Cap.env; ..>) =
+  let _ = caps#env in
+  (* nosemgrep: use-caps *)
+  Unix.getcwd
+let gethostname (caps : < Cap.env; ..>) =
+  let _ = caps#env in
+  (* nosemgrep: use-caps *)
+  Unix.gethostname
