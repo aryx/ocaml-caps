@@ -9,6 +9,29 @@ let argv (caps : < Cap.argv; .. >) =
   (* nosemgrep: do-not-use-argv *)
   Sys.argv
 
+let set_signal (caps : < Cap.signal; .. >) =
+  let _ = caps#signal in
+  (* nosemgrep: use-caps *)
+  Sys.set_signal
+
+(* the files *)
+let file_exists (caps : < Cap.readdir; .. >) file =
+  let _ = caps#readdir file in
+  (* nosemgrep: use-caps *)
+  Sys.file_exists file
+let is_directory (caps : < Cap.readdir; .. >) file =
+  let _ = caps#readdir file in
+  (* nosemgrep: use-caps *)
+  Sys.is_directory file
+let readdir (caps : < Cap.readdir; .. >) dir =
+  let _ = caps#readdir dir in
+  (* nosemgrep: use-caps *)
+  Sys.readdir dir
+let remove (caps : < Cap.open_out; .. >) file =
+  let _ = caps#open_out file in
+  (* nosemgrep: use-caps *)
+  Sys.remove file
+
 let getenv (caps : < Cap.env; ..>) = 
   let _ = caps#env in
   (* nosemgrep: use-caps *)

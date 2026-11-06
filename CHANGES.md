@@ -1,5 +1,12 @@
 ## 0.1.1 (unreleased)
 
+- `CapSys.set_signal` (`Cap.signal`), `file_exists`, `is_directory`,
+  `readdir` (`Cap.readdir`), `remove` (`Cap.open_out`).
+- `CapUnix.setitimer` (`Cap.signal`, the timer's end a signal), `_exit`
+  (`Cap.exit`), `mkfifo` (`Cap.open_out`), and the network's
+  `getaddrinfo`, `socket`, `connect`, `bind`, `listen`, `accept`
+  (`Cap.network`).
+
 - `Cap.clock` (in `misc`, beside `random`): the time, read or waited for;
   `CapUnix.gettimeofday`, `time`, `sleepf`, `sleep`, `CapSys.time`.
 - `Cap.pipe` (in `process_multi`): `CapUnix.pipe`, `socketpair`.
